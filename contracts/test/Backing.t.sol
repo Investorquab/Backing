@@ -26,9 +26,9 @@ contract BackingTest is Test {
         backing = new Backing(vault, EPOCH, 1e6);
 
         vm.prank(alice);
-        backing.registerCreator("Alice", "Makes night-shift lo-fi", "https://x.test/a.png", "alice");
+        backing.registerCreator("Alice", "Makes night-shift lo-fi", "https://x.test/a.png", "alice", 0);
         vm.prank(bob);
-        backing.registerCreator("Bob", "Pixel art", "", "bob");
+        backing.registerCreator("Bob", "Pixel art", "", "bob", 0);
 
         address[3] memory fans = [fan1, fan2, fan3];
         for (uint256 i; i < 3; i++) {
@@ -40,7 +40,7 @@ contract BackingTest is Test {
 
     function _back(address fan, address creator, uint256 amt) internal {
         vm.prank(fan);
-        backing.back(creator, amt);
+        backing.back(creator, amt, bytes20(0), "");
     }
 
     // ------------------------------------------------------------------ profile
@@ -49,22 +49,23 @@ contract BackingTest is Test {
         assertTrue(backing.isCreator(alice));
         assertEq(backing.creatorCount(), 2);
         vm.prank(alice);
-        backing.updateProfile("Alice B", "new bio", "", "aliceb");
+        backing.updateProfile("Alice B", "new bio", "", "aliceb", 4242);
         Backing.CreatorView memory v = backing.getCreator(alice);
         assertEq(v.name, "Alice B");
         assertEq(v.handle, "aliceb");
+        assertEq(v.fid, 4242);
     }
 
     function test_register_twice_reverts() public {
         vm.prank(alice);
         vm.expectRevert(Backing.AlreadyRegistered.selector);
-        backing.registerCreator("A", "", "", "");
+        backing.registerCreator("A", "", "", "", 0);
     }
 
     function test_register_empty_name_reverts() public {
         vm.prank(fan1);
         vm.expectRevert(Backing.InvalidProfile.selector);
-        backing.registerCreator("", "", "", "");
+        backing.registerCreator("", "", "", "", 0);
     }
 
     // ------------------------------------------------------------------ backing
@@ -83,17 +84,17 @@ contract BackingTest is Test {
     function test_back_guards() public {
         vm.prank(fan1);
         vm.expectRevert(Backing.NotRegistered.selector);
-        backing.back(fan2, 10e6);
+        backing.back(fan2, 10e6, bytes20(0), "");
 
         vm.prank(fan1);
         vm.expectRevert(Backing.AmountTooSmall.selector);
-        backing.back(alice, 0.5e6);
+        backing.back(alice, 0.5e6, bytes20(0), "");
 
         usdc.mint(alice, 10e6);
         vm.startPrank(alice);
         usdc.approve(address(backing), 10e6);
         vm.expectRevert(Backing.CannotBackSelf.selector);
-        backing.back(alice, 10e6);
+        backing.back(alice, 10e6, bytes20(0), "");
         vm.stopPrank();
     }
 
@@ -214,6 +215,123 @@ contract BackingTest is Test {
         Backing.CreatorView[] memory list = backing.getCreators(0, 10);
         assertEq(list.length, 2);
         assertEq(list[0].principal, 500e6);
+    }
+
+    // ------------------------------------------------------------------ social layer
+
+    function test_activity_log_newest_first() public {
+        // setUp registered Alice then Bob -> 2 Joined items
+        assertEq(backing.activityCount(), 2);
+        bytes20 cast = bytes20(hex"6a112e2d35e2d2008e25dd29811e8769d1edd9ca");
+        vm.prank(fan1);
+        backing.back(alice, 50e6, cast, "your 3am streams got me through finals");
+        vm.prank(alice);
+        backing.post("New track drops Friday", "https://example.com/track");
+
+        (uint256[] memory ids, Backing.Activity[] memory items) = backing.getActivity(0, 10);
+        assertEq(ids.length, 4);
+        assertEq(ids[0], 3);
+        assertEq(uint8(items[0].kind), uint8(Backing.Kind.Posted));
+        assertEq(items[0].text, "New track drops Friday");
+        assertEq(items[0].link, "https://example.com/track");
+        assertEq(uint8(items[1].kind), uint8(Backing.Kind.Backed));
+        assertEq(items[1].actor, fan1);
+        assertEq(items[1].creator, alice);
+        assertEq(items[1].amount, 50e6);
+        assertEq(items[1].cast, cast);
+        assertEq(items[1].text, "your 3am streams got me through finals");
+        assertEq(uint8(items[3].kind), uint8(Backing.Kind.Joined));
+
+        (ids,) = backing.getActivity(1, 2);
+        assertEq(ids.length, 2);
+        assertEq(ids[0], 2);
+        (ids,) = backing.getActivity(10, 5);
+        assertEq(ids.length, 0);
+    }
+
+    function test_creator_activity_and_counts() public {
+        _back(fan1, bob, 10e6);
+        vm.prank(alice);
+        backing.post("hello", "");
+        vm.prank(alice);
+        backing.post("again", "");
+        (uint256[] memory ids, Backing.Activity[] memory items) = backing.getCreatorActivity(alice, 0, 10);
+        assertEq(ids.length, 3); // joined + 2 posts
+        assertEq(items[0].text, "again");
+        assertEq(backing.getCreator(alice).postCount, 2);
+        (ids,) = backing.getCreatorActivity(bob, 0, 10);
+        assertEq(ids.length, 2); // joined + backed
+    }
+
+    function test_post_guards() public {
+        vm.prank(fan1);
+        vm.expectRevert(Backing.NotRegistered.selector);
+        backing.post("hi", "");
+        vm.prank(alice);
+        vm.expectRevert(Backing.InvalidPost.selector);
+        backing.post("", "");
+        bytes memory long = new bytes(281);
+        for (uint256 i; i < long.length; i++) long[i] = "a";
+        vm.prank(alice);
+        vm.expectRevert(Backing.InvalidPost.selector);
+        backing.post(string(long), "");
+    }
+
+    function test_note_too_long_reverts() public {
+        bytes memory long = new bytes(141);
+        for (uint256 i; i < long.length; i++) long[i] = "a";
+        vm.prank(fan1);
+        vm.expectRevert(Backing.NoteTooLong.selector);
+        backing.back(alice, 10e6, bytes20(0), string(long));
+    }
+
+    function test_cast_stats() public {
+        bytes20 castA = bytes20(uint160(1));
+        bytes20 castB = bytes20(uint160(2));
+        vm.prank(fan1);
+        backing.back(alice, 100e6, castA, "");
+        vm.prank(fan2);
+        backing.back(alice, 50e6, castA, "");
+        vm.prank(fan3);
+        backing.back(alice, 7e6, castB, "");
+        _back(fan3, alice, 1e6); // no cast
+        Backing.CastView[] memory cs = backing.getCasts(alice);
+        assertEq(cs.length, 2);
+        assertEq(cs[0].cast, castA);
+        assertEq(cs[0].backed, 150e6);
+        assertEq(cs[0].backings, 2);
+        assertEq(cs[1].backed, 7e6);
+        assertEq(backing.getCreator(alice).castCount, 2);
+    }
+
+    function test_milestones_logged_once() public {
+        _back(fan1, alice, 99e6);
+        _back(fan1, alice, 2e6); // crosses 100
+        _back(fan2, alice, 5_000e6); // crosses 1k and 5k in one go
+        vm.prank(fan2);
+        backing.unback(alice, 4_000e6); // drops below 5k
+        _back(fan2, alice, 4_000e6); // back above 5k: not logged again
+        (, Backing.Activity[] memory items) = backing.getCreatorActivity(alice, 0, 50);
+        uint256 milestones;
+        uint256 last;
+        for (uint256 i; i < items.length; i++) {
+            if (items[i].kind == Backing.Kind.Milestone) {
+                milestones++;
+                if (last == 0) last = items[i].amount;
+            }
+        }
+        assertEq(milestones, 3);
+        assertEq(last, 5_000e6); // newest milestone first
+    }
+
+    function test_claim_logged() public {
+        _back(fan1, alice, 1_000e6);
+        vm.warp(block.timestamp + 30 days);
+        vm.prank(alice);
+        uint256 got = backing.claim();
+        (, Backing.Activity[] memory items) = backing.getActivity(0, 1);
+        assertEq(uint8(items[0].kind), uint8(Backing.Kind.Claimed));
+        assertEq(items[0].amount, got);
     }
 
     // ------------------------------------------------------------------ solvency

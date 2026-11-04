@@ -10,7 +10,7 @@ export function NetworkSwitch() {
       aria-label="Network"
       value={net.key}
       onChange={(e) => setNet(e.target.value as typeof net.key)}
-      className="rounded-full border border-line bg-panel-2 px-3 py-2 text-xs text-muted outline-none hover:text-fg"
+      className="h-8 rounded-[8px] border border-[var(--line)] bg-card px-2 text-[13px] text-fg-2 outline-none hover:text-fg"
     >
       {AVAILABLE.map((n) => (
         <option key={n.key} value={n.key}>

@@ -6,6 +6,8 @@ import { backingAbi, demoVaultAbi } from "./abi";
 import { useNet } from "./net";
 import { FALLBACK_APY } from "./networks";
 import { errMsg } from "./format";
+import { isHidden } from "./networks";
+import { useMiniApp } from "./miniapp";
 
 const POLL = 5_000;
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
@@ -31,6 +33,7 @@ export type CreatorView = {
   bio: string;
   avatar: string;
   handle: string;
+  fid: bigint;
   registeredAt: bigint;
   lastClaimAt: bigint;
   nextClaimAt: bigint;
@@ -39,7 +42,31 @@ export type CreatorView = {
   claimable: bigint;
   totalClaimed: bigint;
   totalEarned: bigint;
+  postCount: bigint;
+  castCount: bigint;
 };
+
+export enum Kind {
+  Joined = 0,
+  Backed = 1,
+  Claimed = 2,
+  Posted = 3,
+  Milestone = 4,
+}
+
+export type Activity = {
+  id: bigint;
+  kind: Kind;
+  actor: `0x${string}`;
+  creator: `0x${string}`;
+  amount: bigint;
+  time: number;
+  cast: `0x${string}`;
+  text: string;
+  link: string;
+};
+
+export type CastStat = { cast: `0x${string}`; backed: bigint; backings: bigint };
 
 export type PositionView = {
   creator: `0x${string}`;
@@ -52,13 +79,52 @@ export type PositionView = {
 
 export function useCreators() {
   const q = useBackingRead("getCreators", [0n, 500n]);
-  return { ...q, data: q.data as CreatorView[] | undefined };
+  const data = useMemo(() => (q.data as CreatorView[] | undefined)?.filter((c) => !isHidden(c.creator)), [q.data]);
+  return { ...q, data };
+}
+
+/** address (lowercase) -> creator, for naming actors in the feed. */
+export function useCreatorMap() {
+  const { data } = useCreators();
+  return useMemo(() => new Map((data ?? []).map((c) => [c.creator.toLowerCase(), c])), [data]);
+}
+
+type RawActivity = Omit<Activity, "id" | "kind" | "time"> & { kind: number; time: number };
+
+function toActivity(res: unknown): Activity[] | undefined {
+  const d = res as readonly [readonly bigint[], readonly RawActivity[]] | undefined;
+  if (!d) return undefined;
+  return d[1]
+    .map((a, i) => ({ ...a, id: d[0][i], kind: a.kind as Kind, time: Number(a.time) }))
+    .filter((a) => !isHidden(a.creator) && !isHidden(a.actor));
+}
+
+export function useActivity(limit: number) {
+  const q = useBackingRead("getActivity", [0n, BigInt(limit)]);
+  const data = useMemo(() => toActivity(q.data), [q.data]);
+  return { ...q, data };
+}
+
+export function useCreatorActivity(addr: `0x${string}` | undefined, limit: number) {
+  const q = useBackingRead("getCreatorActivity", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
+  const data = useMemo(() => toActivity(q.data), [q.data]);
+  return { ...q, data };
+}
+
+export function useCasts(addr?: `0x${string}`) {
+  const q = useBackingRead("getCasts", [addr ?? ZERO], !!addr);
+  const data = useMemo(
+    () => [...((q.data as CastStat[] | undefined) ?? [])].sort((a, b) => (b.backed > a.backed ? 1 : b.backed < a.backed ? -1 : 0)),
+    [q.data],
+  );
+  return { ...q, data };
 }
 
 export function useCreator(addr?: `0x${string}`) {
   const q = useBackingRead("getCreator", [addr ?? ZERO], !!addr);
   const data = q.data as CreatorView | undefined;
-  return { ...q, data: data && data.registeredAt > 0n ? data : undefined, missing: !!data && data.registeredAt === 0n };
+  const ok = !!data && data.registeredAt > 0n && !isHidden(data.creator);
+  return { ...q, data: ok ? data : undefined, missing: !!data && !ok };
 }
 
 export function useBackers(addr?: `0x${string}`) {
@@ -157,32 +223,35 @@ export function useTx() {
   const { writeContractAsync: rawWrite } = useWriteContract();
   const client = usePublicClient({ chainId: net.chain.id });
   const qc = useQueryClient();
+  const mini = useMiniApp();
   const [state, setState] = useState<TxState>({ status: "idle" });
 
   async function send(steps: TxStep[], doneMessage = "Done") {
     if (!isConnected) {
-      setState({ status: "error", message: "Connect a wallet first." });
+      setState({ status: "error", message: "Sign in first" });
       return false;
     }
     try {
       if (chainId !== net.chain.id) {
-        setState({ status: "pending", message: `Switching to ${net.chain.name}…` });
+        setState({ status: "pending", message: `Switching to ${net.chain.name}` });
         await switchChainAsync({ chainId: net.chain.id });
       }
       let hash: `0x${string}` | undefined;
       for (let i = 0; i < steps.length; i++) {
         const prefix = steps.length > 1 ? `Step ${i + 1}/${steps.length}: ` : "";
-        setState({ status: "pending", message: `${prefix}${steps[i].label} — confirm in your wallet` });
+        setState({ status: "pending", message: `${prefix}${steps[i].label}. Confirm in your wallet` });
         hash = await steps[i].run();
-        setState({ status: "pending", message: `${prefix}${steps[i].label} — waiting for confirmation…`, hash });
+        setState({ status: "pending", message: `${prefix}${steps[i].label}. Waiting for the network`, hash });
         const r = await client!.waitForTransactionReceipt({ hash });
         if (r.status !== "success") throw new Error("Transaction reverted");
       }
       setState({ status: "success", message: doneMessage, hash });
+      mini.haptic("success");
       await qc.invalidateQueries();
       return true;
     } catch (e) {
       setState({ status: "error", message: errMsg(e) });
+      mini.haptic("error");
       return false;
     }
   }

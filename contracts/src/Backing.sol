@@ -5,6 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /// @title Backing — patronage that doesn't disappear
 /// @notice Fans stake a stablecoin behind a creator. Principal is deposited into an
@@ -17,6 +18,11 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 ///         unclaimed creator yield) and spreads that growth across all principal. Because
 ///         principal only changes at sync points, attribution is exact up to rounding,
 ///         and rounding always favours the contract (dust stays in the vault as buffer).
+///
+///         The social layer lives on-chain too, so the app needs no server: creators post
+///         short updates, and every join, backing, claim, update and milestone is appended
+///         to an activity log that the feed reads. A backing can record the Base App /
+///         Farcaster cast that led to it, plus a short note from the backer.
 contract Backing is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -26,6 +32,7 @@ contract Backing is ReentrancyGuard {
 
     struct Creator {
         bool registered;
+        uint8 milestones; // how many MILESTONE thresholds the creator's backing has crossed
         uint64 registeredAt;
         uint64 lastClaimAt;
         uint256 principal; // total principal backing this creator
@@ -38,7 +45,8 @@ contract Backing is ReentrancyGuard {
         string name;
         string bio;
         string avatar; // image URL
-        string handle; // X / social handle, without @
+        string handle; // Base App / Farcaster username, without @
+        uint64 fid; // Farcaster id reported by Base App (0 if unknown). Self-reported, not verified.
     }
 
     struct Position {
@@ -54,6 +62,7 @@ contract Backing is ReentrancyGuard {
         string bio;
         string avatar;
         string handle;
+        uint64 fid;
         uint64 registeredAt;
         uint64 lastClaimAt;
         uint64 nextClaimAt;
@@ -62,6 +71,8 @@ contract Backing is ReentrancyGuard {
         uint256 claimable; // accrued incl. pending yield
         uint256 totalClaimed;
         uint256 totalEarned; // totalClaimed + claimable
+        uint256 postCount;
+        uint256 castCount;
     }
 
     struct PositionView {
@@ -71,6 +82,32 @@ contract Backing is ReentrancyGuard {
         uint256 principal;
         uint256 yieldGenerated; // incl. pending
         uint64 since;
+    }
+
+    enum Kind {
+        Joined,
+        Backed,
+        Claimed,
+        Posted,
+        Milestone
+    }
+
+    /// @notice One item in the public feed.
+    struct Activity {
+        Kind kind;
+        address actor; // backer for Backed, the creator for everything else
+        address creator;
+        uint96 amount; // asset units: amount backed / claimed, or the milestone crossed
+        uint40 time;
+        bytes20 cast; // Farcaster cast hash that led to a backing (zero if none)
+        string text; // backer's note, or the creator's update
+        string link; // optional https link on an update
+    }
+
+    struct CastView {
+        bytes20 cast;
+        uint256 backed; // total ever backed through this cast
+        uint256 backings; // number of backings through this cast
     }
 
     // ---------------------------------------------------------------------
@@ -99,6 +136,12 @@ contract Backing is ReentrancyGuard {
     mapping(address => address[]) internal _backedBy; // backer => creators
     mapping(address => mapping(address => uint256)) internal _creatorIdx; // backer => creator => index+1
 
+    Activity[] internal _activity;
+    mapping(address => uint256[]) internal _creatorActivity; // creator => activity ids
+    mapping(address => uint256) internal _postCount;
+    mapping(address => bytes20[]) internal _casts; // creator => casts that brought backing
+    mapping(address => mapping(bytes20 => CastView)) internal _castStats;
+
     // ---------------------------------------------------------------------
     // Events / errors
     // ---------------------------------------------------------------------
@@ -109,6 +152,8 @@ contract Backing is ReentrancyGuard {
     event Unbacked(address indexed backer, address indexed creator, uint256 amount, uint256 newPrincipal);
     event Claimed(address indexed creator, uint256 amount);
     event YieldSynced(uint256 newYield, uint256 accYieldPerPrincipal);
+    event Posted(address indexed creator, uint256 indexed activityId);
+    event ActivityAdded(uint256 indexed id, Kind indexed kind, address indexed creator);
 
     error NotRegistered();
     error AlreadyRegistered();
@@ -119,6 +164,8 @@ contract Backing is ReentrancyGuard {
     error EpochNotOver(uint64 nextClaimAt);
     error NothingToClaim();
     error VaultAssetMismatch();
+    error InvalidPost();
+    error NoteTooLong();
 
     constructor(IERC4626 vault_, uint64 epochLength_, uint256 minBack_) {
         vault = vault_;
@@ -132,27 +179,46 @@ contract Backing is ReentrancyGuard {
     // Creator profile
     // ---------------------------------------------------------------------
 
-    function registerCreator(string calldata name, string calldata bio, string calldata avatar, string calldata handle)
-        external
-    {
+    function registerCreator(
+        string calldata name,
+        string calldata bio,
+        string calldata avatar,
+        string calldata handle,
+        uint64 fid
+    ) external {
         Creator storage c = _creators[msg.sender];
         if (c.registered) revert AlreadyRegistered();
         _validateProfile(name, bio, avatar, handle);
         c.registered = true;
         c.registeredAt = uint64(block.timestamp);
         c.accDebt = accYieldPerPrincipal;
-        _profiles[msg.sender] = Profile(name, bio, avatar, handle);
+        _profiles[msg.sender] = Profile({name: name, bio: bio, avatar: avatar, handle: handle, fid: fid});
         _creatorList.push(msg.sender);
         emit CreatorRegistered(msg.sender, name);
+        _log(Kind.Joined, msg.sender, msg.sender, 0, bytes20(0), "", "");
     }
 
-    function updateProfile(string calldata name, string calldata bio, string calldata avatar, string calldata handle)
-        external
-    {
+    function updateProfile(
+        string calldata name,
+        string calldata bio,
+        string calldata avatar,
+        string calldata handle,
+        uint64 fid
+    ) external {
         if (!_creators[msg.sender].registered) revert NotRegistered();
         _validateProfile(name, bio, avatar, handle);
-        _profiles[msg.sender] = Profile(name, bio, avatar, handle);
+        _profiles[msg.sender] = Profile({name: name, bio: bio, avatar: avatar, handle: handle, fid: fid});
         emit ProfileUpdated(msg.sender);
+    }
+
+    /// @notice Post a short update to your backers' feeds. Stored on-chain and public.
+    function post(string calldata text, string calldata link) external {
+        if (!_creators[msg.sender].registered) revert NotRegistered();
+        uint256 n = bytes(text).length;
+        if (n == 0 || n > 280 || bytes(link).length > 256) revert InvalidPost();
+        _postCount[msg.sender]++;
+        uint256 id = _log(Kind.Posted, msg.sender, msg.sender, 0, bytes20(0), text, link);
+        emit Posted(msg.sender, id);
     }
 
     function _validateProfile(string calldata name, string calldata bio, string calldata avatar, string calldata handle)
@@ -170,11 +236,14 @@ contract Backing is ReentrancyGuard {
     // ---------------------------------------------------------------------
 
     /// @notice Back `creator` with `amount` of the asset. Requires prior approval.
-    function back(address creator, uint256 amount) external nonReentrant {
+    /// @param cast  Farcaster cast hash that led to this backing, or zero.
+    /// @param note  Optional public note from the backer (max 140 bytes).
+    function back(address creator, uint256 amount, bytes20 cast, string calldata note) external nonReentrant {
         Creator storage c = _creators[creator];
         if (!c.registered) revert NotRegistered();
         if (creator == msg.sender) revert CannotBackSelf();
         if (amount < minBack) revert AmountTooSmall();
+        if (bytes(note).length > 140) revert NoteTooLong();
 
         _sync();
         _settleCreator(c);
@@ -195,6 +264,24 @@ contract Backing is ReentrancyGuard {
         totalPrincipal += amount;
 
         emit Backed(msg.sender, creator, amount, p.principal);
+        _log(Kind.Backed, msg.sender, creator, amount, cast, note, "");
+
+        if (cast != bytes20(0)) {
+            CastView storage cv = _castStats[creator][cast];
+            if (cv.backings == 0) {
+                cv.cast = cast;
+                _casts[creator].push(cast);
+            }
+            cv.backed += amount;
+            cv.backings += 1;
+        }
+
+        uint8 m = c.milestones;
+        while (m < MILESTONE_COUNT && c.principal >= _milestone(m)) {
+            _log(Kind.Milestone, creator, creator, _milestone(m), bytes20(0), "", "");
+            m++;
+        }
+        c.milestones = m;
     }
 
     /// @notice Withdraw `amount` of principal from a backing. Stops future yield on that amount.
@@ -250,6 +337,7 @@ contract Backing is ReentrancyGuard {
 
         amount = _withdrawFromVault(amount, msg.sender);
         emit Claimed(msg.sender, amount);
+        _log(Kind.Claimed, msg.sender, msg.sender, amount, bytes20(0), "", "");
     }
 
     /// @notice Anyone can push accrued vault yield into the accounting.
@@ -313,6 +401,40 @@ contract Backing is ReentrancyGuard {
         return c.lastClaimAt + epochLength;
     }
 
+    uint8 internal constant MILESTONE_COUNT = 8;
+
+    /// @dev 100, 1k, 5k, 10k, 50k, 100k, 500k, 1M (in whole asset units, 6 decimals assumed)
+    function _milestone(uint8 i) internal pure returns (uint256) {
+        uint32[8] memory whole = [uint32(100), 1_000, 5_000, 10_000, 50_000, 100_000, 500_000, 1_000_000];
+        return uint256(whole[i]) * 1e6;
+    }
+
+    function _log(
+        Kind kind,
+        address actor,
+        address creator,
+        uint256 amount,
+        bytes20 cast,
+        string memory text,
+        string memory link
+    ) internal returns (uint256 id) {
+        id = _activity.length;
+        _activity.push(
+            Activity({
+                kind: kind,
+                actor: actor,
+                creator: creator,
+                amount: SafeCast.toUint96(amount),
+                time: uint40(block.timestamp),
+                cast: cast,
+                text: text,
+                link: link
+            })
+        );
+        _creatorActivity[creator].push(id);
+        emit ActivityAdded(id, kind, creator);
+    }
+
     function _addLink(address backer, address creator) internal {
         _backersOf[creator].push(backer);
         _backerIdx[creator][backer] = _backersOf[creator].length;
@@ -370,6 +492,7 @@ contract Backing is ReentrancyGuard {
             bio: pr.bio,
             avatar: pr.avatar,
             handle: pr.handle,
+            fid: pr.fid,
             registeredAt: c.registeredAt,
             lastClaimAt: c.lastClaimAt,
             nextClaimAt: _nextClaimAt(c),
@@ -377,7 +500,9 @@ contract Backing is ReentrancyGuard {
             backerCount: _backersOf[creator].length,
             claimable: cl,
             totalClaimed: c.totalClaimed,
-            totalEarned: c.totalClaimed + cl
+            totalEarned: c.totalClaimed + cl,
+            postCount: _postCount[creator],
+            castCount: _casts[creator].length
         });
     }
 
@@ -425,6 +550,60 @@ contract Backing is ReentrancyGuard {
         out = new PositionView[](list.length);
         for (uint256 i; i < list.length; i++) {
             out[i] = getPosition(backer, list[i]);
+        }
+    }
+
+    function activityCount() external view returns (uint256) {
+        return _activity.length;
+    }
+
+    function getActivityById(uint256 id) external view returns (Activity memory) {
+        return _activity[id];
+    }
+
+    /// @notice Newest-first page of the global feed. `offset` counts back from the newest item.
+    function getActivity(uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory ids, Activity[] memory items)
+    {
+        uint256 n = _activity.length;
+        if (offset >= n) return (new uint256[](0), new Activity[](0));
+        uint256 count = n - offset < limit ? n - offset : limit;
+        ids = new uint256[](count);
+        items = new Activity[](count);
+        for (uint256 i; i < count; i++) {
+            uint256 id = n - 1 - offset - i;
+            ids[i] = id;
+            items[i] = _activity[id];
+        }
+    }
+
+    /// @notice Newest-first page of one creator's activity (joins, backings, claims, updates, milestones).
+    function getCreatorActivity(address creator, uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory ids, Activity[] memory items)
+    {
+        uint256[] storage list = _creatorActivity[creator];
+        uint256 n = list.length;
+        if (offset >= n) return (new uint256[](0), new Activity[](0));
+        uint256 count = n - offset < limit ? n - offset : limit;
+        ids = new uint256[](count);
+        items = new Activity[](count);
+        for (uint256 i; i < count; i++) {
+            uint256 id = list[n - 1 - offset - i];
+            ids[i] = id;
+            items[i] = _activity[id];
+        }
+    }
+
+    /// @notice Casts that brought backing to `creator`, oldest first.
+    function getCasts(address creator) external view returns (CastView[] memory out) {
+        bytes20[] storage list = _casts[creator];
+        out = new CastView[](list.length);
+        for (uint256 i; i < list.length; i++) {
+            out[i] = _castStats[creator][list[i]];
         }
     }
 

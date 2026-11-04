@@ -27,12 +27,12 @@ contract ForkTest is Test {
         address creator = makeAddr("creator");
         address fan = makeAddr("fan");
         vm.prank(creator);
-        backing.registerCreator("Creator", "", "", "");
+        backing.registerCreator("Creator", "", "", "", 0);
 
         deal(USDC, fan, 10_000e6);
         vm.startPrank(fan);
         IERC20(USDC).approve(address(backing), type(uint256).max);
-        backing.back(creator, 10_000e6);
+        backing.back(creator, 10_000e6, bytes20(0), "");
         vm.stopPrank();
 
         vm.warp(block.timestamp + 30 days);

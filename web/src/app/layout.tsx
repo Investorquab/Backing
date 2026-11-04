@@ -1,23 +1,25 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Header } from "@/components/Header";
+import { Header, TabBar } from "@/components/Header";
 import { NetBanner } from "@/components/NetBanner";
+import { SITE_URL } from "@/lib/networks";
+import { miniAppEmbed } from "@/lib/embed";
 
-const title = "Backing — your capital works the night shift";
-const description =
-  "Back creators without spending a cent. Stake USDC behind a creator on Base; the yield goes to them, your principal stays yours and you can withdraw any time.";
+const title = "Backing";
+const description = "Back creators with money you keep. Stake USDC on Base, the yield goes to them, and you can withdraw every cent any time.";
 
 export const metadata: Metadata = {
-  title,
+  title: { default: "Backing: back creators with money you keep", template: "%s · Backing" },
   description,
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  openGraph: { title, description, type: "website" },
-  twitter: { card: "summary", title, description },
-  icons: { icon: "/icon.svg" },
+  metadataBase: new URL(SITE_URL),
+  openGraph: { title, description, type: "website", images: [{ url: "/card.png", width: 1200, height: 800 }] },
+  twitter: { card: "summary_large_image", title, description, images: ["/card.png"] },
+  icons: { icon: "/icon.svg", apple: "/icon-1024.png" },
+  other: miniAppEmbed({ imageUrl: `${SITE_URL}/card.png`, title: "Open Backing", url: SITE_URL }),
 };
 
-export const viewport: Viewport = { themeColor: "#0a0c16", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#07080d", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -26,12 +28,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <Header />
           <NetBanner />
-          <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-4 sm:pt-8">{children}</main>
-          <footer className="mx-auto max-w-5xl px-4 pb-10 text-xs leading-relaxed text-dim">
-            Backing is experimental software built for Vibestarter Vibeathon 02. Principal is deposited in a third-party
-            ERC-4626 vault and is subject to smart-contract and vault risk. Backers don&apos;t earn returns; the yield goes to
-            creators. Not financial advice.
+          <main className="mx-auto w-full max-w-6xl px-4 pb-40 pt-6 sm:px-6 sm:pt-8 md:pb-24">{children}</main>
+          <footer className="mx-auto max-w-6xl px-4 pb-28 text-[12px] leading-relaxed text-muted sm:px-6 md:pb-10">
+            Backing is experimental software built for Vibestarter Vibeathon 02. Principal sits in a third-party ERC-4626 vault and carries smart-contract and vault
+            risk. Backers earn no return, the yield goes to creators. Not financial advice
           </footer>
+          <TabBar />
         </Providers>
       </body>
     </html>

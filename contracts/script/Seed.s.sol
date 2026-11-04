@@ -47,20 +47,39 @@ contract Seed is Script {
         for (uint256 i; i < 4; i++) {
             if (backing.isCreator(vm.addr(ck[i]))) continue;
             vm.startBroadcast(ck[i]);
-            backing.registerCreator(names[i], bios[i], "", handles[i]);
+            backing.registerCreator(names[i], bios[i], "", handles[i], 0);
             vm.stopBroadcast();
         }
 
         // fan i backs a spread of creators with different amounts
         uint256[6] memory amounts = [uint256(2_500e6), 1_200e6, 800e6, 400e6, 150e6, 50e6];
+        string[6] memory notes = [
+            "Your sets carry my night shifts at the bakery",
+            "",
+            "Rent is due and this costs me nothing. Easy yes",
+            "",
+            "First backing. Keep drawing those streets",
+            ""
+        ];
         for (uint256 i; i < 6; i++) {
             vm.startBroadcast(fk[i]);
             usdc.approve(address(backing), type(uint256).max);
-            backing.back(vm.addr(ck[i % 4]), amounts[i]);
-            if (i < 3) backing.back(vm.addr(ck[(i + 1) % 4]), amounts[i] / 2);
+            backing.back(vm.addr(ck[i % 4]), amounts[i], bytes20(0), notes[i]);
+            if (i < 3) backing.back(vm.addr(ck[(i + 1) % 4]), amounts[i] / 2, bytes20(0), "");
             vm.stopBroadcast();
         }
-        console2.log("Seeded 4 demo creators and 6 demo backers");
+        string[4] memory updates = [
+            "New mix is up: two hours of slow tape loops for whoever is still awake",
+            "Episode 14 is live. Ada finally finishes her shift at the 24h pharmacy",
+            "Streaming tonight from 00:00 WAT, fixing the indexer bug live",
+            "Finished the Lagos night market series. Prints next week"
+        ];
+        for (uint256 i; i < 4; i++) {
+            vm.startBroadcast(ck[i]);
+            backing.post(updates[i], "");
+            vm.stopBroadcast();
+        }
+        console2.log("Seeded 4 demo creators, 6 demo backers and 4 updates");
     }
 
     uint256 constant SECP_N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;

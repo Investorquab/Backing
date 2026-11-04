@@ -17,7 +17,7 @@ export function Avatar({ address, src, name, size = 40 }: { address: string; src
         src={src}
         alt={name ?? ""}
         style={style}
-        className="shrink-0 rounded-full border border-line object-cover"
+        className="shrink-0 rounded-full border border-[var(--line)] bg-raised object-cover"
         onError={() => setBroken(true)}
       />
     );
@@ -32,8 +32,8 @@ export function Avatar({ address, src, name, size = 40 }: { address: string; src
     .join("");
   return (
     <div
-      style={{ ...style, background: `linear-gradient(135deg, hsl(${a} 70% 55%), hsl(${b} 60% 25%))`, fontSize: size * 0.38 }}
-      className="flex shrink-0 items-center justify-center rounded-full border border-line font-semibold text-white/90"
+      style={{ ...style, background: `hsl(${a} 22% ${24 + (b % 10)}%)`, fontSize: size * 0.38 }}
+      className="flex shrink-0 items-center justify-center rounded-full border border-[var(--line)] font-medium text-white/90"
       aria-hidden
     >
       {initials}

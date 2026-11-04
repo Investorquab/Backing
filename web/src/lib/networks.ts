@@ -36,7 +36,7 @@ export const NETWORKS: Record<NetKey, Network> = {
     explorer: "https://sepolia.basescan.org",
     deployment: dep(sepolia),
     symbol: "tUSDC",
-    vaultName: "Demo yield vault (accelerated)",
+    vaultName: "Demo vault, sped up",
   },
   base: {
     key: "base",
@@ -55,7 +55,7 @@ export const NETWORKS: Record<NetKey, Network> = {
     short: "Local",
     deployment: dep(local),
     symbol: "tUSDC",
-    vaultName: "Demo yield vault (accelerated)",
+    vaultName: "Demo vault, sped up",
   },
 };
 
@@ -68,3 +68,18 @@ export const AVAILABLE: Network[] = (["sepolia", "base", "local"] as NetKey[])
 export const DEFAULT_NET: NetKey = AVAILABLE[0]?.key ?? "sepolia";
 
 export const FALLBACK_APY = Number(process.env.NEXT_PUBLIC_FALLBACK_APY || "0.05");
+
+/** Addresses whose profiles and posts the site hides (comma separated). On-chain data can't be deleted. */
+export const HIDDEN = new Set(
+  (process.env.NEXT_PUBLIC_HIDDEN_ADDRESSES || "")
+    .split(",")
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean),
+);
+export const isHidden = (a?: string) => !!a && HIDDEN.has(a.toLowerCase());
+
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, "");
+
+export function netFromParam(v?: string | null): NetKey {
+  return AVAILABLE.some((n) => n.key === v) ? (v as NetKey) : DEFAULT_NET;
+}

@@ -36,6 +36,19 @@ export const backingAbi = [
   },
   {
     "type": "function",
+    "name": "activityCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "asset",
     "inputs": [],
     "outputs": [
@@ -60,6 +73,16 @@ export const backingAbi = [
         "name": "amount",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "cast",
+        "type": "bytes20",
+        "internalType": "bytes20"
+      },
+      {
+        "name": "note",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "outputs": [],
@@ -138,6 +161,138 @@ export const backingAbi = [
   },
   {
     "type": "function",
+    "name": "getActivity",
+    "inputs": [
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "ids",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "items",
+        "type": "tuple[]",
+        "internalType": "struct Backing.Activity[]",
+        "components": [
+          {
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "enum Backing.Kind"
+          },
+          {
+            "name": "actor",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "time",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cast",
+            "type": "bytes20",
+            "internalType": "bytes20"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "link",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getActivityById",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Backing.Activity",
+        "components": [
+          {
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "enum Backing.Kind"
+          },
+          {
+            "name": "actor",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "time",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cast",
+            "type": "bytes20",
+            "internalType": "bytes20"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "link",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getBackers",
     "inputs": [
       {
@@ -161,6 +316,42 @@ export const backingAbi = [
         "name": "generated",
         "type": "uint256[]",
         "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCasts",
+    "inputs": [
+      {
+        "name": "creator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "out",
+        "type": "tuple[]",
+        "internalType": "struct Backing.CastView[]",
+        "components": [
+          {
+            "name": "cast",
+            "type": "bytes20",
+            "internalType": "bytes20"
+          },
+          {
+            "name": "backed",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "backings",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -207,6 +398,11 @@ export const backingAbi = [
             "internalType": "string"
           },
           {
+            "name": "fid",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "registeredAt",
             "type": "uint64",
             "internalType": "uint64"
@@ -245,6 +441,92 @@ export const backingAbi = [
             "name": "totalEarned",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "postCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "castCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getCreatorActivity",
+    "inputs": [
+      {
+        "name": "creator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "ids",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "items",
+        "type": "tuple[]",
+        "internalType": "struct Backing.Activity[]",
+        "components": [
+          {
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "enum Backing.Kind"
+          },
+          {
+            "name": "actor",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "time",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "cast",
+            "type": "bytes20",
+            "internalType": "bytes20"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "link",
+            "type": "string",
+            "internalType": "string"
           }
         ]
       }
@@ -298,6 +580,11 @@ export const backingAbi = [
             "internalType": "string"
           },
           {
+            "name": "fid",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
             "name": "registeredAt",
             "type": "uint64",
             "internalType": "uint64"
@@ -334,6 +621,16 @@ export const backingAbi = [
           },
           {
             "name": "totalEarned",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "postCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "castCount",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -483,6 +780,24 @@ export const backingAbi = [
   },
   {
     "type": "function",
+    "name": "post",
+    "inputs": [
+      {
+        "name": "text",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "link",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "registerCreator",
     "inputs": [
       {
@@ -504,6 +819,11 @@ export const backingAbi = [
         "name": "handle",
         "type": "string",
         "internalType": "string"
+      },
+      {
+        "name": "fid",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "outputs": [],
@@ -637,6 +957,11 @@ export const backingAbi = [
         "name": "handle",
         "type": "string",
         "internalType": "string"
+      },
+      {
+        "name": "fid",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "outputs": [],
@@ -654,6 +979,31 @@ export const backingAbi = [
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "ActivityAdded",
+    "inputs": [
+      {
+        "name": "id",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "kind",
+        "type": "uint8",
+        "indexed": true,
+        "internalType": "enum Backing.Kind"
+      },
+      {
+        "name": "creator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -720,6 +1070,25 @@ export const backingAbi = [
         "type": "string",
         "indexed": false,
         "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Posted",
+    "inputs": [
+      {
+        "name": "creator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "activityId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -820,12 +1189,22 @@ export const backingAbi = [
   },
   {
     "type": "error",
+    "name": "InvalidPost",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidProfile",
     "inputs": []
   },
   {
     "type": "error",
     "name": "NotRegistered",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NoteTooLong",
     "inputs": []
   },
   {
@@ -837,6 +1216,22 @@ export const backingAbi = [
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "SafeCastOverflowedUintDowncast",
+    "inputs": [
+      {
+        "name": "bits",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

@@ -3,24 +3,35 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAccount } from "wagmi";
 import { backingAbi } from "@/lib/abi";
-import { useApr, useBackers, useCreator, useTx, type CreatorView } from "@/lib/hooks";
-import { countdown, num, short, usd } from "@/lib/format";
+import { useApr, useBackers, useCreator, useCreatorMap, useTx, type CreatorView } from "@/lib/hooks";
+import { countdown, money, num, short } from "@/lib/format";
 import { useNet } from "@/lib/net";
+import { useMiniApp } from "@/lib/miniapp";
 import { Avatar } from "@/components/Avatar";
 import { ShareRow, profileUrl } from "@/components/ShareRow";
-import { Empty, LiveNumber, Skeleton, Stat, TxStatus, useNow } from "@/components/ui";
+import { SignIn } from "@/components/SignIn";
+import { TheBlock, tierOf } from "@/components/TheBlock";
+import { WindowMark } from "@/components/WindowMark";
+import { Empty, LiveNumber, PageTitle, Skeleton, Stat, StatRow, TxStatus, useNow } from "@/components/ui";
 
 const YEAR = 365 * 24 * 3600;
+const bytes = (s: string) => new TextEncoder().encode(s).length;
 
-export default function CreatorDashboard() {
+export default function Studio() {
   const { address, isConnected } = useAccount();
   const { data: c, isLoading, missing } = useCreator(address);
 
   if (!isConnected)
     return (
-      <Empty title="Creators: get backed, not tipped">
-        Connect the wallet you want to receive income with. Fans stake USDC behind you; you claim the yield every epoch.
-      </Empty>
+      <div className="mx-auto max-w-3xl">
+        <PageTitle title="Studio" sub="Get backed, not tipped" />
+        <Empty title="Sign in with the wallet you want to be paid in">
+          Fans stake USDC behind you. You collect the yield it earns, every epoch
+          <div className="mt-4 flex justify-center">
+            <SignIn big />
+          </div>
+        </Empty>
+      </div>
     );
   if (isLoading) return <Skeleton className="h-64" />;
   if (missing || !c) return <ProfileForm />;
@@ -30,109 +41,160 @@ export default function CreatorDashboard() {
 function Dashboard({ c }: { c: CreatorView }) {
   const { net } = useNet();
   const d = net.deployment!;
-  const { apr, incomeApr, demo } = useApr();
+  const { apr, incomeApr } = useApr();
   const { dataUpdatedAt } = useCreator(c.creator);
   const { rows } = useBackers(c.creator);
+  const creators = useCreatorMap();
   const tx = useTx();
   const now = useNow();
   const [editing, setEditing] = useState(false);
 
   const p = num(c.principal);
-  const perSec = (p * apr) / YEAR;
   const wait = Number(c.nextClaimAt) - now;
   const canClaim = wait <= 0 && c.claimable > 0n;
   const unit = (n: number, w: string) => (n === 1 ? w : `${n} ${w}s`);
-  const epochLabel =
-    d.epochSeconds >= 86400 ? unit(d.epochSeconds / 86400, "day") : d.epochSeconds >= 3600 ? unit(d.epochSeconds / 3600, "hour") : unit(Math.round(d.epochSeconds / 60), "minute");
+  const epoch = d.epochSeconds >= 86400 ? unit(d.epochSeconds / 86400, "day") : d.epochSeconds >= 3600 ? unit(d.epochSeconds / 3600, "hour") : unit(Math.round(d.epochSeconds / 60), "minute");
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-4">
-        <Avatar address={c.creator} src={c.avatar} name={c.name} size={56} />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-bold tracking-tight sm:text-3xl">{c.name}</h1>
-          <Link href={`/c/${c.creator}`} className="text-sm text-dim hover:text-fg">
-            View public profile →
-          </Link>
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex items-center gap-4">
+          <Avatar address={c.creator} src={c.avatar} name={c.name} size={48} />
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[28px] font-medium leading-tight tracking-[-0.01em]">Studio</h1>
+            <Link href={`/c/${c.creator}`} className="text-[14px] text-fg-2 hover:text-fg">
+              {c.name} · view public profile
+            </Link>
+          </div>
         </div>
+
+        <section className="surface p-5 sm:p-6">
+          <div className="flex items-center gap-2 text-[13px] text-fg-2">
+            <WindowMark size={12} /> Ready to claim
+          </div>
+          <LiveNumber className="mt-2 block text-[40px] font-medium leading-none text-lamp sm:text-[48px]" value={num(c.claimable)} perSecond={(p * apr) / YEAR} at={dataUpdatedAt} />
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <button
+              className="btn btn-primary"
+              disabled={!canClaim || tx.state.status === "pending"}
+              onClick={() =>
+                tx.send(
+                  [{ label: "Claim yield", run: () => tx.writeContractAsync({ chainId: net.chain.id, address: d.backing, abi: backingAbi, functionName: "claim" }) }],
+                  "Claimed. It's in your wallet",
+                )
+              }
+            >
+              Claim to wallet
+            </button>
+            <span className="text-[14px] text-fg-2">
+              {wait > 0 ? `Next claim in ${countdown(wait)}` : c.claimable > 0n ? "You can claim now" : "Nothing to claim yet"} · claims open every {epoch}
+            </span>
+          </div>
+          <TxStatus state={tx.state} />
+        </section>
+
+        <StatRow cols={4}>
+          <Stat label="Backing">{money(p)}</Stat>
+          <Stat label="Backers">{Number(c.backerCount)}</Stat>
+          <Stat label="A month" note={`at ${Math.round(incomeApr * 100)}% a year`}>
+            {money((p * incomeApr) / 12)}
+          </Stat>
+          <Stat label="Claimed so far">{money(num(c.totalClaimed))}</Stat>
+        </StatRow>
+
+        <Composer c={c} />
+
+        <section>
+          <h2 className="mb-3 text-[17px] font-medium">Your backers</h2>
+          {!rows || rows.length === 0 ? (
+            <Empty title="No backers yet">Share your profile to light the first window</Empty>
+          ) : (
+            <ul className="surface divide-line">
+              {rows.map((r) => (
+                <li key={r.backer} className="flex items-center gap-3 px-4 py-3 text-[14px]">
+                  <Avatar address={r.backer} src={creators.get(r.backer.toLowerCase())?.avatar} size={28} />
+                  <div className="min-w-0 flex-1">
+                    <div className="num truncate">{creators.get(r.backer.toLowerCase())?.name ?? short(r.backer)}</div>
+                    <div className="num text-[12px] text-muted">
+                      {tierOf(num(r.principal)).name} · sent {money(num(r.generated))}
+                    </div>
+                  </div>
+                  <span className="num">{money(num(r.principal))}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section>{editing ? <ProfileForm existing={c} onDone={() => setEditing(false)} /> : <button className="btn btn-secondary" onClick={() => setEditing(true)}>Edit profile</button>}</section>
       </div>
 
-      <section className="card p-5 sm:p-6">
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-dim">
-          <span className="live-dot" /> Claimable now
+      <aside className="flex flex-col gap-4 lg:sticky lg:top-20 lg:self-start">
+        <div className="surface p-5">
+          <div className="text-[15px] font-medium">Grow your block</div>
+          <p className="mt-1 text-[14px] text-fg-2">
+            Every $1,000 backed sends you about {money((1000 * incomeApr) / 12)} a month at {Math.round(incomeApr * 100)}% a year
+          </p>
+          <TheBlock className="mx-auto mt-4 w-[160px]" cols={4} minRows={5} lit={(rows ?? []).map((r) => ({ key: r.backer, amount: num(r.principal) }))} />
+          <div className="num mt-4 truncate rounded-[8px] bg-raised px-3 py-2 text-[12px] text-fg-2">{profileUrl(c.creator, net.key)}</div>
+          <div className="mt-3">
+            <ShareRow address={c.creator} name={c.name} mine />
+          </div>
         </div>
-        <LiveNumber className="glow mt-2 block text-4xl font-bold text-lamp sm:text-5xl" value={num(c.claimable)} perSecond={perSec} at={dataUpdatedAt} />
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button
-            className="btn btn-lamp"
-            disabled={!canClaim || tx.state.status === "pending"}
-            onClick={() =>
-              tx.send(
-                [{ label: "Claim yield", run: () => tx.writeContractAsync({ chainId: net.chain.id, address: d.backing, abi: backingAbi, functionName: "claim" }) }],
-                "Claimed. It's in your wallet.",
-              )
-            }
-          >
-            Claim to wallet
-          </button>
-          <span className="text-sm text-muted">
-            {wait > 0 ? `Next claim in ${countdown(wait)}` : c.claimable > 0n ? "Ready to claim" : "Nothing to claim yet"} · claims open
-            once every {epochLabel}
-          </span>
-        </div>
-        <TxStatus state={tx.state} />
-      </section>
-
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Backing">
-          <span className="num">${usd(p)}</span>
-        </Stat>
-        <Stat label="Backers">
-          <span className="num">{Number(c.backerCount)}</span>
-        </Stat>
-        <Stat label="Est. / month" hint={demo ? `at ${Math.round(incomeApr * 100)}% real APY` : undefined}>
-          <span className="num text-ok">${usd((p * incomeApr) / 12)}</span>
-        </Stat>
-        <Stat label="Claimed all time">
-          <span className="num">${usd(num(c.totalClaimed))}</span>
-        </Stat>
-      </section>
-
-      <section className="card p-5">
-        <div className="mb-1 font-semibold">Grow your backing</div>
-        <p className="mb-4 text-sm text-muted">Every $1,000 backed sends you about ${usd((1000 * incomeApr) / 12)}/month at {demo ? `a real-world ${Math.round(incomeApr * 100)}% APY` : "today\u2019s rate"}. Share your link:</p>
-        <div className="num mb-3 truncate rounded-xl bg-panel-2 px-3 py-2 text-xs text-muted">{profileUrl(c.creator, net.key)}</div>
-        <ShareRow address={c.creator} name={c.name} text="Back me on Backing: your USDC stays yours, its yield supports my work." />
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold">Your backers</h2>
-        {!rows || rows.length === 0 ? (
-          <Empty title="No backers yet">Share your profile link to get your first backer.</Empty>
-        ) : (
-          <ul className="card divide-y divide-line">
-            {rows.map((r) => (
-              <li key={r.backer} className="flex items-center gap-3 px-4 py-3 text-sm">
-                <Avatar address={r.backer} size={28} />
-                <span className="num flex-1">{short(r.backer)}</span>
-                <span className="num text-xs text-ok">+${usd(num(r.generated))}</span>
-                <span className="num w-24 text-right">${usd(num(r.principal))}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section>
-        {editing ? (
-          <ProfileForm existing={c} onDone={() => setEditing(false)} />
-        ) : (
-          <button className="btn btn-ghost" onClick={() => setEditing(true)}>
-            Edit profile
-          </button>
-        )}
-      </section>
+      </aside>
     </div>
+  );
+}
+
+function Composer({ c }: { c: CreatorView }) {
+  const { net } = useNet();
+  const d = net.deployment!;
+  const mini = useMiniApp();
+  const tx = useTx();
+  const [text, setText] = useState("");
+  const [link, setLink] = useState("");
+  const [posted, setPosted] = useState<string | null>(null);
+  const n = bytes(text);
+  const linkOk = !link || (/^https:\/\/\S+$/.test(link) && bytes(link) <= 256);
+  const valid = text.trim().length > 0 && n <= 280 && linkOk;
+
+  async function submit() {
+    const body = text.trim();
+    const ok = await tx.send(
+      [{ label: "Post update", run: () => tx.writeContractAsync({ chainId: net.chain.id, address: d.backing, abi: backingAbi, functionName: "post", args: [body, link.trim()] }) }],
+      "Posted to your backers' feeds",
+    );
+    if (ok) {
+      setPosted(body);
+      setText("");
+      setLink("");
+    }
+  }
+
+  return (
+    <section className="surface p-5">
+      <label htmlFor="update" className="text-[15px] font-medium">
+        Post an update
+      </label>
+      <p className="mt-1 text-[14px] text-fg-2">It shows in the feed of everyone who backs you. Updates are stored on Base and can&apos;t be deleted</p>
+      <textarea id="update" className="input mt-3 min-h-24" placeholder="What are you working on tonight" value={text} onChange={(e) => setText(e.target.value)} />
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+        <input className="input" placeholder="Link, optional (https://…)" value={link} onChange={(e) => setLink(e.target.value.trim())} aria-label="Link" />
+        <div className="flex items-center gap-3">
+          <span className={`num text-[12px] ${n > 280 ? "text-neg" : "text-muted"}`}>{n}/280</span>
+          <button className="btn btn-primary" disabled={!valid || tx.state.status === "pending"} onClick={submit}>
+            Post
+          </button>
+        </div>
+      </div>
+      {!linkOk && <p className="mt-2 text-[13px] text-neg">Links start with https://</p>}
+      <TxStatus state={tx.state} />
+      {posted && mini.inMiniApp && (
+        <button className="btn btn-secondary btn-sm mt-3" onClick={() => mini.composeCast(posted, profileUrl(c.creator, net.key))}>
+          Also cast it
+        </button>
+      )}
+    </section>
   );
 }
 
@@ -140,97 +202,106 @@ function ProfileForm({ existing, onDone }: { existing?: CreatorView; onDone?: ()
   const { net } = useNet();
   const d = net.deployment!;
   const { address } = useAccount();
+  const mini = useMiniApp();
   const tx = useTx();
-  const [f, setF] = useState({ name: "", bio: "", avatar: "", handle: "" });
+  const [f, setF] = useState({ name: "", bio: "", avatar: "", handle: "", fid: 0 });
+
   useEffect(() => {
-    if (existing) setF({ name: existing.name, bio: existing.bio, avatar: existing.avatar, handle: existing.handle });
+    if (existing) setF({ name: existing.name, bio: existing.bio, avatar: existing.avatar, handle: existing.handle, fid: Number(existing.fid) });
   }, [existing]);
 
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  // Inside Base App, start from the profile people already know.
+  const fromApp = () => {
+    const u = mini.user;
+    if (!u) return;
+    setF((s) => ({
+      ...s,
+      name: (u.displayName || u.username || s.name).slice(0, 48),
+      handle: u.username ?? s.handle,
+      avatar: u.pfpUrl && /^https:\/\//.test(u.pfpUrl) && bytes(u.pfpUrl) <= 256 ? u.pfpUrl : s.avatar,
+      fid: u.fid,
+    }));
+  };
+  useEffect(() => {
+    if (!existing && mini.user) fromApp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mini.user, existing]);
+
+  const set = (k: "name" | "bio" | "avatar" | "handle") => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setF((s) => ({ ...s, [k]: k === "handle" ? e.target.value.replace(/^@/, "").trim() : e.target.value }));
-  const enc = new TextEncoder();
   const valid =
-    f.name.trim().length > 0 &&
-    enc.encode(f.name).length <= 48 &&
-    enc.encode(f.bio).length <= 280 &&
-    enc.encode(f.avatar).length <= 256 &&
-    enc.encode(f.handle).length <= 32 &&
-    (!f.avatar || /^https:\/\//.test(f.avatar));
+    f.name.trim().length > 0 && bytes(f.name) <= 48 && bytes(f.bio) <= 280 && bytes(f.avatar) <= 256 && bytes(f.handle) <= 32 && (!f.avatar || /^https:\/\//.test(f.avatar));
 
   async function submit() {
-    const args = [f.name.trim(), f.bio.trim(), f.avatar.trim(), f.handle] as const;
+    const args = [f.name.trim(), f.bio.trim(), f.avatar.trim(), f.handle, BigInt(f.fid)] as const;
     const ok = await tx.send(
       [
         {
           label: existing ? "Update profile" : "Create profile",
-          run: () =>
-            tx.writeContractAsync({
-              chainId: net.chain.id,
-              address: d.backing,
-              abi: backingAbi,
-              functionName: existing ? "updateProfile" : "registerCreator",
-              args,
-            }),
+          run: () => tx.writeContractAsync({ chainId: net.chain.id, address: d.backing, abi: backingAbi, functionName: existing ? "updateProfile" : "registerCreator", args }),
         },
       ],
-      existing ? "Profile updated" : "You're live. Share your link to get backed.",
+      existing ? "Profile updated" : "You're live. Share your profile to get your first backer",
     );
     if (ok) onDone?.();
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="card flex flex-col gap-4 p-5 sm:p-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{existing ? "Edit profile" : "Set up your creator profile"}</h1>
-          {!existing && (
-            <p className="mt-1 text-sm text-muted">
-              Fans back you with USDC that stays theirs. You get the yield, claimable every epoch. Your profile is stored on-chain on{" "}
-              {net.chain.name}.
-            </p>
-          )}
-        </div>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted">Name *</span>
-          <input className="input" maxLength={48} value={f.name} onChange={set("name")} placeholder="Nocturne Beats" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="flex justify-between text-muted">
-            Bio <span className="num text-dim">{f.bio.length}/280</span>
-          </span>
-          <textarea className="input min-h-24" maxLength={280} value={f.bio} onChange={set("bio")} placeholder="What do you make, and what will backing help you do?" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted">Avatar image URL (https)</span>
-          <input className="input" value={f.avatar} onChange={set("avatar")} placeholder="https://…" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-muted">X handle</span>
-          <input className="input" value={f.handle} onChange={set("handle")} placeholder="yourhandle" />
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn btn-lamp" disabled={!valid || tx.state.status === "pending"} onClick={submit}>
-            {existing ? "Save changes" : "Create profile"}
-          </button>
-          {onDone && (
-            <button className="btn btn-ghost" onClick={onDone}>
-              Cancel
-            </button>
-          )}
-        </div>
-        <TxStatus state={tx.state} />
-      </div>
-      <div>
-        <div className="mb-2 text-xs uppercase tracking-wider text-dim">Preview</div>
-        <div className="card p-5">
-          <div className="flex items-center gap-3">
-            <Avatar address={address ?? "0x0"} src={f.avatar} name={f.name || "?"} size={52} />
-            <div className="min-w-0">
-              <div className="truncate font-semibold">{f.name || "Your name"}</div>
-              {f.handle && <div className="text-xs text-dim">@{f.handle}</div>}
+    <div className={existing ? "" : "mx-auto max-w-4xl"}>
+      {!existing && <PageTitle title="Set up your creator profile" sub={`Fans back you with USDC that stays theirs. You collect the yield. Your profile is stored on ${net.chain.name}`} />}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="surface flex flex-col gap-4 p-5">
+          {mini.user && (
+            <div className="flex items-center gap-3 rounded-[10px] bg-raised p-3 text-[14px]">
+              <Avatar address={address ?? "0x0"} src={mini.user.pfpUrl} name={mini.user.displayName} size={28} />
+              <span className="flex-1 text-fg-2">Using your Base App profile{mini.user.username ? ` @${mini.user.username}` : ""}</span>
+              <button className="btn btn-quiet btn-sm" onClick={fromApp}>
+                Refill
+              </button>
             </div>
+          )}
+          <label className="flex flex-col gap-2 text-[14px]">
+            <span className="text-fg-2">Name</span>
+            <input className="input" maxLength={48} value={f.name} onChange={set("name")} placeholder="Nocturne Beats" />
+          </label>
+          <label className="flex flex-col gap-2 text-[14px]">
+            <span className="flex justify-between text-fg-2">
+              Bio <span className="num text-[12px] text-muted">{bytes(f.bio)}/280</span>
+            </span>
+            <textarea className="input min-h-24" value={f.bio} onChange={set("bio")} placeholder="What you make, and what backing helps you do" />
+          </label>
+          <label className="flex flex-col gap-2 text-[14px]">
+            <span className="text-fg-2">Picture link, https</span>
+            <input className="input" value={f.avatar} onChange={set("avatar")} placeholder="https://…" />
+          </label>
+          <label className="flex flex-col gap-2 text-[14px]">
+            <span className="text-fg-2">Base App username</span>
+            <input className="input" value={f.handle} onChange={set("handle")} placeholder="yourname" />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn btn-primary" disabled={!valid || tx.state.status === "pending"} onClick={submit}>
+              {existing ? "Save changes" : "Create profile"}
+            </button>
+            {onDone && (
+              <button className="btn btn-quiet" onClick={onDone}>
+                Cancel
+              </button>
+            )}
           </div>
-          <p className="mt-3 whitespace-pre-line text-sm text-muted">{f.bio || "Your bio shows here."}</p>
+          <TxStatus state={tx.state} />
+        </div>
+        <div>
+          <div className="mb-2 text-[13px] text-fg-2">Preview</div>
+          <div className="surface p-5">
+            <div className="flex items-center gap-3">
+              <Avatar address={address ?? "0x0"} src={f.avatar} name={f.name || "?"} size={44} />
+              <div className="min-w-0">
+                <div className="truncate font-medium">{f.name || "Your name"}</div>
+                {f.handle && <div className="text-[13px] text-muted">@{f.handle}</div>}
+              </div>
+            </div>
+            <p className="mt-3 whitespace-pre-line text-[14px] text-fg-2">{f.bio || "Your bio shows here"}</p>
+          </div>
         </div>
       </div>
     </div>

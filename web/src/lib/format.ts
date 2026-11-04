@@ -16,24 +16,15 @@ export function num(v: bigint | undefined | null): number {
   return v ? Number(formatUnits(v, DECIMALS)) : 0;
 }
 
-/** $1,234.56 style. Small values get more precision so live yield visibly moves. */
-export function usd(n: number, opts: { precise?: boolean } = {}): string {
-  const abs = Math.abs(n);
-  let digits = 2;
-  if (opts.precise) digits = abs >= 1000 ? 4 : 6;
-  else if (abs > 0 && abs < 0.01) digits = 4;
-  return n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
-}
-
-export function compact(n: number): string {
-  if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M`;
-  if (n >= 1e4) return `${(n / 1e3).toFixed(1)}k`;
-  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+/** One money format everywhere: $1,234.56. Live tickers add digits so the movement is visible. */
+export function money(n: number, opts: { live?: boolean } = {}): string {
+  const digits = opts.live ? (Math.abs(n) >= 1000 ? 2 : 4) : 2;
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 export const short = (a?: string) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
 
-export function since(ts: number | bigint): string {
+export function ago(ts: number | bigint): string {
   const s = Math.max(0, Math.floor(Date.now() / 1000) - Number(ts));
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)}m`;
@@ -53,23 +44,32 @@ export function countdown(seconds: number): string {
   return `${s}s`;
 }
 
+/** Pulls a 20-byte Farcaster cast hash out of a hash or a cast URL. */
+export function parseCastHash(v?: string | null): `0x${string}` | null {
+  const m = v?.match(/0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/);
+  return m ? (m[0].toLowerCase() as `0x${string}`) : null;
+}
+
+export const ZERO_CAST = "0x0000000000000000000000000000000000000000" as const;
+
 export function errMsg(e: unknown): string {
-  const err = e as { shortMessage?: string; message?: string; name?: string };
+  const err = e as { shortMessage?: string; message?: string };
   const m = err?.shortMessage || err?.message || "Something went wrong";
-  if (/User rejected|denied/i.test(m)) return "You cancelled in your wallet.";
-  if (/insufficient funds/i.test(m)) return "Not enough ETH for gas on this network.";
-  const custom = m.match(/reverted with the following reason:\s*\n?(.*)/)?.[1] || m.match(/error (\w+)\(/)?.[1];
+  if (/User rejected|denied|rejected the request/i.test(m)) return "Cancelled in your wallet";
+  if (/insufficient funds/i.test(m)) return "Not enough ETH for gas on this network";
   const map: Record<string, string> = {
-    CannotBackSelf: "You can't back yourself.",
-    AmountTooSmall: "Minimum backing is 1 USDC.",
-    InsufficientPrincipal: "That's more than you have staked.",
-    EpochNotOver: "This epoch isn't over yet.",
-    NothingToClaim: "Nothing to claim yet.",
-    AlreadyRegistered: "This wallet already has a creator profile.",
-    InvalidProfile: "Check your profile: name is required, bio up to 280 characters.",
-    FaucetCooldown: "Faucet is once per hour. Try again later.",
-    NotRegistered: "That address isn't a creator.",
+    CannotBackSelf: "You can't back yourself",
+    AmountTooSmall: "The minimum is 1 USDC",
+    InsufficientPrincipal: "That's more than you have staked",
+    EpochNotOver: "This epoch isn't over yet",
+    NothingToClaim: "Nothing to claim yet",
+    AlreadyRegistered: "This wallet already has a creator profile",
+    InvalidProfile: "Check your profile. A name is required and the bio fits in 280 characters",
+    InvalidPost: "Updates need text, up to 280 characters",
+    NoteTooLong: "Notes fit in 140 characters",
+    FaucetCooldown: "The faucet works once an hour",
+    NotRegistered: "That address isn't a creator",
   };
   for (const k of Object.keys(map)) if (m.includes(k)) return map[k];
-  return custom || m.split("\n")[0];
+  return m.split("\n")[0];
 }
