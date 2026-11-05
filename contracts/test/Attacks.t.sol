@@ -5,6 +5,7 @@ import {Base} from "./Backing.t.sol";
 import {Backing} from "../src/Backing.sol";
 import {MockYieldVault} from "../src/mocks/MockYieldVault.sol";
 import {ReentrantVault} from "./mocks/ReentrantVault.sol";
+import {FeeVault} from "./mocks/FeeVault.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @notice Each test is an attempt to steal money or break the accounting.
@@ -83,6 +84,18 @@ contract AttackTest is Base {
         b2.back(alice, 100e6, address(0));
         vm.stopPrank();
         assertEq(usdc.balanceOf(fan1), START);
+    }
+
+    // 4b. A vault that charges a withdrawal/redemption fee is refused at construction, so it can
+    //     never silently under-collateralize the backers who stay (security review finding F1).
+    function test_attack_fee_vault_is_refused() public {
+        FeeVault fee = new FeeVault(usdc, 100); // 1% exit fee
+        vm.expectRevert(Backing.VaultNotSupported.selector);
+        new Backing(fee, EPOCH, 1e6);
+        // a tiny fee is still refused: the guard tolerance is ~0.1%, well below any real fee
+        FeeVault smallFee = new FeeVault(usdc, 20); // 0.2%
+        vm.expectRevert(Backing.VaultNotSupported.selector);
+        new Backing(smallFee, EPOCH, 1e6);
     }
 
     // 5. Donating to the vault just becomes creator yield; backers exit exactly whole.

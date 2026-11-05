@@ -157,6 +157,7 @@ contract Backing is ReentrancyGuard {
     error VaultAssetMismatch();
     error InvalidPost();
     error DepositLoss();
+    error VaultNotSupported();
 
     constructor(IERC4626 vault_, uint64 epochLength_, uint256 minBack_) {
         vault = vault_;
@@ -164,6 +165,16 @@ contract Backing is ReentrancyGuard {
         if (address(asset) == address(0)) revert VaultAssetMismatch();
         epochLength = epochLength_;
         minBack = minBack_;
+
+        // Only accept a fee-free, synchronous vault. A preview round-trip of a probe amount must
+        // come back about whole, and withdrawing must not cost materially more shares than
+        // depositing gave. A deposit/withdraw fee (or a vault that rounds against us) would let
+        // each exit quietly under-collateralize everyone who stays, so we refuse it up front
+        // rather than trust the vault address. Tuned for 6-decimal USDC.
+        uint256 probe = 1e6;
+        uint256 shares = vault_.previewDeposit(probe);
+        if (shares == 0 || vault_.previewRedeem(shares) + probe / 1000 + 2 < probe) revert VaultNotSupported();
+        if (vault_.previewWithdraw(probe) > shares + shares / 1000 + 2) revert VaultNotSupported();
     }
 
     // ---------------------------------------------------------------------
