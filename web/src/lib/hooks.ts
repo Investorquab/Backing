@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useAccount, usePublicClient, useReadContract, useSwitchChain, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient, useReadContract, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { backingAbi, demoVaultAbi } from "./abi";
 import { useNet } from "./net";
@@ -137,6 +137,47 @@ export function usePosts(limit: number) {
 export function usePostsBy(addr: `0x${string}` | undefined, limit: number) {
   const q = useBackingRead("getPostsBy", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
   return { ...q, data: useMemo(() => toActivities(q.data), [q.data]) };
+}
+
+/**
+ * Newest-first posts from a set of creators, merged across them. Used by the feed's
+ * "People I back" tab so it shows every post from people you back, not just the ones
+ * that happen to be in the newest page of the global feed.
+ */
+export function usePostsByCreators(creators: readonly `0x${string}`[], enabled: boolean) {
+  const { net } = useNet();
+  const d = net.deployment;
+  const contracts = useMemo(
+    () =>
+      creators.map((c) => ({
+        chainId: net.chain.id,
+        address: d?.backing ?? ZERO,
+        abi: backingAbi,
+        functionName: "getPostsBy",
+        args: [c, 0n, 50n],
+      })),
+    [creators, d?.backing, net.chain.id],
+  );
+  const q = useReadContracts({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    contracts: contracts as any,
+    query: { enabled: !!d && enabled && creators.length > 0, refetchInterval: POLL },
+  });
+  const data = useMemo(() => {
+    if (!enabled) return undefined;
+    if (creators.length === 0) return [] as Activity[];
+    if (!q.data) return undefined;
+    const all: Activity[] = [];
+    for (const r of q.data) {
+      if (r.status === "success") {
+        const acts = toActivities(r.result);
+        if (acts) all.push(...acts);
+      }
+    }
+    all.sort((a, b) => (b.id > a.id ? 1 : b.id < a.id ? -1 : 0));
+    return all;
+  }, [q.data, enabled, creators.length]);
+  return { ...q, data };
 }
 
 /** Everything that concerns `addr`, newest first: their notifications. */

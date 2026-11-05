@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
-import { useApr, useBacking, usePeopleMap, usePosts, useStats } from "@/lib/hooks";
+import { useApr, useBacking, usePeopleMap, usePosts, usePostsByCreators, useStats } from "@/lib/hooks";
 import { money, num } from "@/lib/format";
 import { NetBanner } from "@/components/NetBanner";
 import { PostCard } from "@/components/PostCard";
@@ -18,11 +18,14 @@ export default function Feed() {
   const { address, status } = useAccount();
   const [tab, setTab] = useState<Tab>("all");
   const [limit, setLimit] = useState(30);
-  const { data: posts, isLoading } = usePosts(limit);
+  const { data: posts, isLoading: allLoading } = usePosts(limit);
   const people = usePeopleMap();
   const { rows } = useBacking(address);
-  const backing = useMemo(() => new Set((rows ?? []).map((r) => r.creator.toLowerCase())), [rows]);
-  const shown = useMemo(() => (tab === "all" ? posts ?? [] : (posts ?? []).filter((p) => backing.has(p.subject.toLowerCase()))), [posts, tab, backing]);
+  const creators = useMemo(() => (rows ?? []).map((r) => r.creator), [rows]);
+  const backing = useMemo(() => new Set(creators.map((c) => c.toLowerCase())), [creators]);
+  const { data: backedPosts, isLoading: backedLoading } = usePostsByCreators(creators, tab === "backing");
+  const shown = tab === "all" ? posts ?? [] : backedPosts ?? [];
+  const isLoading = tab === "all" ? allLoading : backedLoading;
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,12 +47,18 @@ export default function Feed() {
         <Skeleton className="h-64" />
       ) : shown.length === 0 ? (
         <div className="surface px-6 py-12 text-center">
-          <div className="text-[18px] font-medium">{tab === "backing" ? "Back someone to see their posts here" : "No posts yet"}</div>
+          <div className="text-[18px] font-medium">
+            {tab === "backing" ? (creators.length === 0 ? "Back someone to see their posts here" : "No posts yet from people you back") : "No posts yet"}
+          </div>
           <p className="mt-2 text-fg-2">
             {tab === "backing" ? (
-              <Link className="text-lamp hover:underline" href="/search">
-                Find people to back
-              </Link>
+              creators.length === 0 ? (
+                <Link className="text-lamp hover:underline" href="/search">
+                  Find people to back
+                </Link>
+              ) : (
+                "Their posts will show up here as soon as they post"
+              )
             ) : (
               "Be the first to post"
             )}
@@ -60,7 +69,7 @@ export default function Feed() {
           {shown.map((p) => (
             <PostCard key={p.id.toString()} p={p} people={people} backing={backing} />
           ))}
-          {posts && posts.length >= limit && (
+          {tab === "all" && posts && posts.length >= limit && (
             <button className="btn btn-quiet btn-sm self-center" onClick={() => setLimit((l) => l + 30)}>
               Show older posts
             </button>

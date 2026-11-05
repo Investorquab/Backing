@@ -12,17 +12,26 @@ import { Avatar } from "./Avatar";
 import { SignIn } from "./SignIn";
 import { Invite } from "./Invite";
 import { Withdraw } from "./Withdraw";
-import { LiveNumber, TxStatus } from "./ui";
+import { LiveNumber, Skeleton, TxStatus } from "./ui";
 
 const YEAR = 365 * 24 * 3600;
 
 export function BackDialog() {
   const ui = useUi();
   const t = ui.backTarget;
-  const { data: c } = useProfile(t?.creator);
+  const { data: c, missing } = useProfile(t?.creator);
   return (
     <Modal open={!!t} onClose={ui.closeBack} title={c ? `Back @${c.profile.username}` : "Back"}>
       {t && c && <BackForm key={t.creator} creator={c.account} username={c.profile.username} avatar={c.profile.avatar} />}
+      {t && !c &&
+        (missing ? (
+          <p className="text-fg-2">This profile isn&apos;t available.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-24" />
+          </div>
+        ))}
     </Modal>
   );
 }
