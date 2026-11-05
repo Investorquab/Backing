@@ -44,7 +44,7 @@ export function PostCard({ p, people, backing }: { p: Activity; people: Map<stri
       {p.text && <p className="whitespace-pre-line break-words px-4 pt-3 text-[16px] leading-[1.5]">{p.text}</p>}
       {img && (
         <div className="mt-3 border-t border-[var(--line)] bg-raised">
-          <img src={img} alt="" loading="lazy" className="max-h-[560px] w-full object-cover" />
+          <img src={img} alt={`Picture in @${name}'s post`} loading="lazy" className="max-h-[560px] w-full object-cover" />
         </div>
       )}
       {!img && <div className="h-4" />}

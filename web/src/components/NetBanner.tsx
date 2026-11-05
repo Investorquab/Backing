@@ -54,7 +54,7 @@ export function NetBanner() {
         {address && (
           <div className="flex items-center gap-3">
             <span className="num text-[13px] text-muted">
-              {money(num(bal.data as bigint | undefined))} {net.symbol}
+              {bal.data === undefined ? "—" : money(num(bal.data as bigint))} {net.symbol}
             </span>
             <button
               className="btn btn-secondary btn-sm"

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Bell, Home, PieChart, Plus, Search, UserRound } from "lucide-react";
@@ -70,6 +70,7 @@ export function TopBar() {
 /** Phone tab bar. */
 export function TabBar() {
   const path = usePathname();
+  const router = useRouter();
   const { address } = useAccount();
   const { data: me } = useProfile(address);
   const ui = useUi();
@@ -87,7 +88,7 @@ export function TabBar() {
         {tab("/search", "Search", Search)}
         <div className="flex flex-1 justify-center">
           <button
-            onClick={() => (me ? ui.openCompose() : (window.location.href = "/profile/edit"))}
+            onClick={() => (me ? ui.openCompose() : router.push("/profile/edit"))}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-lamp text-lamp-ink"
             aria-label="New post"
           >

@@ -97,7 +97,7 @@ function Profile({ p, at }: { p: ProfileView; at: number }) {
           <TheBlock className="hidden w-[96px] shrink-0 sm:block" cols={4} minRows={3} lit={(backers ?? []).map((r) => ({ key: r.backer, amount: num(r.principal) }))} />
         </div>
 
-        <dl className="grid grid-cols-4 gap-2 px-5 py-4 text-center">
+        <dl className="grid grid-cols-2 gap-x-2 gap-y-4 px-5 py-4 text-center sm:grid-cols-4 sm:gap-2">
           <Stat k="Backing" v={money(total)} />
           <Stat k="Backers" v={String(Number(p.backerCount))} />
           <Stat k="Backs" v={String(Number(p.backingCount))} />

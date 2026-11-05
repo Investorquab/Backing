@@ -11,18 +11,23 @@ export function LiveNumber({ value, perSecond = 0, at = 0, className = "" }: { v
 
 export function Stat({ label, children, note }: { label: string; children: React.ReactNode; note?: string }) {
   return (
-    <div className="px-4 py-3">
-      <div className="text-[13px] text-fg-2">{label}</div>
-      <div className="num mt-1 text-[22px] font-medium leading-tight sm:text-[24px]">{children}</div>
-      {note && <div className="mt-1 text-[12px] text-muted">{note}</div>}
+    <div className="min-w-0 px-3 py-3 sm:px-4">
+      <div className="truncate text-[13px] text-fg-2">{label}</div>
+      <div className="num mt-1 truncate text-[18px] font-medium leading-tight sm:text-[24px]">{children}</div>
+      {note && <div className="truncate text-[12px] text-muted">{note}</div>}
     </div>
   );
 }
 
-/** A row of figures inside one surface, split by hairlines. */
+/** A row of figures inside one surface, split by hairlines. Wraps cleanly to 2x2 on phones. */
 export function StatRow({ children, cols = 3 }: { children: React.ReactNode; cols?: 2 | 3 | 4 }) {
-  const grid = cols === 4 ? "grid-cols-2 sm:grid-cols-4" : cols === 2 ? "grid-cols-2" : "grid-cols-3";
-  return <div className={`surface grid ${grid} [&>*]:border-[var(--line)] [&>*+*]:border-l`}>{children}</div>;
+  const grid =
+    cols === 4
+      ? "grid-cols-2 sm:grid-cols-4 [&>*:nth-child(even)]:border-l [&>*:nth-child(n+3)]:border-t sm:[&>*:nth-child(n+3)]:border-t-0 sm:[&>*+*]:border-l"
+      : cols === 2
+        ? "grid-cols-2 [&>*+*]:border-l"
+        : "grid-cols-3 [&>*+*]:border-l";
+  return <div className={`surface grid ${grid} [&>*]:border-[var(--line)]`}>{children}</div>;
 }
 
 export function TxStatus({ state }: { state: TxState }) {

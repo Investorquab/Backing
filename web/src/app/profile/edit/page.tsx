@@ -121,6 +121,8 @@ function Editor({ existing }: { existing?: Form }) {
               <span className="inline-flex items-center gap-1 text-pos">
                 <Check size={13} strokeWidth={2} /> Available
               </span>
+            ) : isUsername(f.username) ? (
+              "Checking…"
             ) : (
               "3 to 20 characters: lowercase letters, numbers and _"
             )}

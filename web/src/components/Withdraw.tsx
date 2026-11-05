@@ -31,7 +31,7 @@ export function Withdraw({ creator, principal, onDone }: { creator: `0x${string}
     <div>
       {some ? (
         <div className="flex gap-2">
-          <input className="input num h-9" inputMode="decimal" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(",", "."))} />
+          <input className="input num h-9" inputMode="decimal" aria-label="Amount to withdraw" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value.replace(",", "."))} />
           <button className="btn btn-secondary btn-sm h-9" disabled={!units || units > principal || busy} onClick={() => units && run("unback", [creator, units], units)}>
             Withdraw
           </button>

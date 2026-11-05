@@ -101,11 +101,16 @@ function Intro() {
       </div>
       <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-[var(--line)] px-6 py-4 text-[14px] text-fg-2 sm:px-8">
         <span>
-          <span className="num text-fg">{money(tvl)}</span> backing creators
+          <span className="num text-fg">{stats ? money(tvl) : "—"}</span> backing creators
         </span>
         <span className="flex items-center gap-1.5">
           <WindowMark size={12} />
-          <LiveNumber className="text-fg" value={num(stats?.distributed)} perSecond={(tvl * apr) / YEAR} at={dataUpdatedAt} /> earned by creators
+          {stats ? (
+            <LiveNumber className="text-fg" value={num(stats.distributed)} perSecond={(tvl * apr) / YEAR} at={dataUpdatedAt} />
+          ) : (
+            <span className="num text-fg">—</span>
+          )}{" "}
+          earned by creators
         </span>
       </div>
     </section>

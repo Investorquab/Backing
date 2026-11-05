@@ -12,7 +12,9 @@ function hue(address: string, salt: number) {
 export function Avatar({ address, src, name, size = 40 }: { address: string; src?: string; name?: string; size?: number }) {
   const [broken, setBroken] = useState(false);
   const style = { width: size, height: size };
-  const ok = safeImage(src) ?? (src && /^https:\/\//.test(src) ? src : null);
+  // Only load avatars from trusted hosts (our site + the upload store), same as post images,
+  // so a profile can't point the <img> at an arbitrary server to track or fingerprint viewers.
+  const ok = safeImage(src);
   if (ok && !broken) {
     return (
       <img
