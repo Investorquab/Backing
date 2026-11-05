@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { PageHeader } from "@/components/Shell";
 
 export const metadata: Metadata = { title: "Security" };
 
@@ -11,7 +10,8 @@ const ATTACKS: [string, string][] = [
   ["ERC-4626 inflation attack", "Deposits that come back short are refused"],
   ["Donating to move the share price", "Becomes creator yield. Backers still exit exactly whole"],
   ["Rounding drain over many tiny backings", "No profit, other backers untouched"],
-  ["Closing someone's ended backing", "The money always goes to the backer, never the caller"],
+  ["Squatting a username", "Usernames are unique; only the owner can release one"],
+  ["Faking invites", "Referring yourself, or a wallet with no profile, counts for nothing"],
   ["Withdrawing someone else's principal", "Impossible"],
   ["Claiming twice or early", "One claim per epoch"],
 ];
@@ -19,11 +19,12 @@ const ATTACKS: [string, string][] = [
 export default function Security() {
   return (
     <>
-      <PageHeader title="Security" sub="How we tried to break Backing" />
-      <div className="flex flex-col gap-6 px-4 py-5 text-[15px]">
+      <h1 className="text-[22px] font-medium">Security</h1>
+      <p className="mt-1 text-fg-2">How we tried to break Backing</p>
+      <div className="mt-5 flex flex-col gap-6 text-[15px]">
         <p className="text-fg-2">
-          Backing is unaudited hackathon code. Before deploying, we attacked the contract on purpose: 43 automated tests, including a fuzz test run 2,000 times and four
-          invariants checked across 30,720 random actions each, with vault gains and losses mixed in. Three issues turned up during that testing and were fixed before deployment
+          Backing is unaudited hackathon code. Before deploying, we attacked the contract on purpose: 34 automated tests, including a fuzz test run 2,000 times and four
+          invariants checked across 30,720 random actions each, with vault gains and losses mixed in. Three issues turned up during earlier testing and were fixed before deployment
         </p>
         <section>
           <h2 className="mb-2 text-[17px] font-medium">The promises</h2>

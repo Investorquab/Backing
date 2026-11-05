@@ -8,24 +8,22 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 
 /// @title Backing — patronage that doesn't disappear
-/// @notice Fans stake a stablecoin behind a creator. Principal goes into an audited ERC-4626
-///         vault and always belongs to the fan. The yield it earns is attributed to the creator,
-///         who claims it once per epoch. A backing can be ongoing, end after a set time, or be
-///         locked for that time.
+/// @notice Fans stake a stablecoin behind a creator. The principal goes into an ERC-4626 vault
+///         (Morpho / Moonwell on Base) and always belongs to the fan, withdrawable any time. The
+///         yield it earns goes to the creator, who claims it once per epoch.
+///
+///         Anyone can make a profile (unique username, Base name, picture, bio, link), post, and be
+///         backed. Every join, backing, withdrawal, claim, post and milestone is appended to an
+///         activity log the app reads as its feed and notifications, so no server is needed.
 /// @dev    Accounting
-///         - One "yield per unit of principal" accumulator (MasterChef-style). Every write first
-///           syncs: vault growth beyond what is owed is spread across all principal.
-///         - owedToUsers = totalPrincipal + unclaimed creator yield. `reserve` sits on top: yield
-///           that nobody was entitled to (growth while nothing was backed, yield after a timed
-///           backing ended). It is never paid out and is the first thing a vault loss eats.
-///         - If the vault ever holds less than owedToUsers, every exit (unback, close, claim) is
-///           paid pro rata (value / owedToUsers), so the loss is shared instead of hitting
-///           whoever withdraws last.
-///         - Timed backings: yield earned after `endsAt` is moved from the creator to the reserve
-///           when the position is next touched (interpolated by time). Anyone can `close` an
-///           ended backing; the principal always goes to the backer.
-///         Social layer: profiles, posts with an optional picture, comments, and an append-only
-///         activity log the app reads as its feed and notifications. No server needed.
+///         - One "yield per unit of principal" accumulator. Every write first syncs: vault growth
+///           beyond what is owed is spread across all principal.
+///         - owedToUsers = principal + unclaimed creator yield. `reserve` sits on top: growth
+///           nobody was entitled to (e.g. while nothing was backed). It's never paid out and is
+///           the first thing a vault loss eats.
+///         - If the vault holds less than owedToUsers, every exit is paid pro rata, so a loss is
+///           shared instead of hitting whoever withdraws last.
+///         - Deposits that come back short (ERC-4626 inflation attack) are refused.
 contract Backing is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
@@ -33,120 +31,74 @@ contract Backing is ReentrancyGuard {
     // Types
     // ---------------------------------------------------------------------
 
-    struct Creator {
-        bool registered;
+    struct Profile {
+        string username; // unique, 3-20 chars: a-z 0-9 _
+        string baseName; // e.g. ada.base.eth (self-reported)
+        string avatar; // picture URL
+        string bio;
+        string link; // website or social link
+    }
+
+    struct Account {
+        bool exists;
         uint8 milestones;
-        uint64 registeredAt;
+        uint64 joinedAt;
         uint64 lastClaimAt;
-        uint256 principal;
+        uint256 principal; // total backing behind this person
         uint256 accrued; // settled, unclaimed yield
         uint256 accDebt;
         uint256 totalClaimed;
-    }
-
-    struct Profile {
-        string name;
-        string bio;
-        string avatar; // image URL
-        string banner; // image URL
-        string handle; // Base App / Farcaster username
-        uint64 fid; // Farcaster id reported by Base App. Self-reported.
-        string x; // X username, without @
-        string xPost; // id of the X post that carries this wallet's link code (checked off-chain)
+        uint256 referred; // backers this person brought in with their invite link
     }
 
     struct Position {
         uint256 principal;
-        uint256 yieldGenerated; // lifetime yield this position produced for the creator
+        uint256 yieldGenerated; // lifetime yield this position sent the creator
         uint256 accDebt;
         uint64 since; // first backed (resets after a full exit)
-        uint64 settledAt; // last time this position's yield was settled
-        uint64 endsAt; // 0 = ongoing. After this the backing stops counting and anyone can close it
-        uint64 lockedUntil; // principal can't be withdrawn before this (0 = flexible)
-    }
-
-    struct BackOptions {
-        uint64 duration; // seconds; 0 = ongoing
-        bool lock; // lock the principal for `duration`
-        bytes20 cast; // Farcaster cast that led here, or zero
-        uint256 post; // activity id of the creator's post that led here, or 0
-        string note; // public note, max 140 bytes
     }
 
     enum Kind {
         Joined,
         Backed,
+        Unbacked,
         Claimed,
         Posted,
-        Milestone,
-        Commented,
-        Ended
+        Milestone
     }
 
     struct Activity {
         Kind kind;
-        address actor; // backer, commenter, or the creator
-        address creator;
+        address actor; // who did it
+        address subject; // whose profile it's about (the creator)
+        address referrer; // Backed: who invited the backer
         uint96 amount;
         uint40 time;
-        bytes20 cast;
-        uint256 ref; // Backed/Commented: the post id
-        string text; // note, post text or comment
-        string link; // post link (any https URL, e.g. an X post)
+        string text; // post text
         string image; // post picture URL
     }
 
-    struct PostStats {
-        uint128 backed; // total backed through this post
-        uint32 backings;
-        uint32 comments;
-    }
-
-    struct CreatorView {
-        address creator;
-        string name;
-        string bio;
-        string avatar;
-        string banner;
-        string handle;
-        uint64 fid;
-        string x;
-        string xPost;
-        uint64 registeredAt;
-        uint64 lastClaimAt;
+    struct ProfileView {
+        address account;
+        Profile profile;
+        uint64 joinedAt;
         uint64 nextClaimAt;
         uint256 principal;
         uint256 backerCount;
+        uint256 backingCount; // how many people this account backs
         uint256 claimable;
         uint256 totalClaimed;
         uint256 totalEarned;
         uint256 postCount;
-        uint256 castCount;
+        uint256 referred;
     }
 
     struct PositionView {
+        address backer;
         address creator;
-        string creatorName;
-        string creatorAvatar;
         uint256 principal;
         uint256 yieldGenerated;
         uint64 since;
-        uint64 endsAt;
-        uint64 lockedUntil;
-    }
-
-    struct BackerView {
-        address backer;
-        uint256 principal;
-        uint256 generated;
-        uint64 endsAt;
-        uint64 lockedUntil;
-    }
-
-    struct CastView {
-        bytes20 cast;
-        uint256 backed;
-        uint256 backings;
     }
 
     // ---------------------------------------------------------------------
@@ -154,8 +106,7 @@ contract Backing is ReentrancyGuard {
     // ---------------------------------------------------------------------
 
     uint256 private constant PRECISION = 1e27;
-    uint64 public constant MAX_DURATION = 366 days;
-    uint8 internal constant MILESTONE_COUNT = 8;
+    uint8 private constant MILESTONE_COUNT = 8;
 
     IERC20 public immutable asset;
     IERC4626 public immutable vault;
@@ -168,42 +119,36 @@ contract Backing is ReentrancyGuard {
     uint256 public totalClaimed;
     uint256 public reserve;
 
-    mapping(address => Creator) internal _creators;
+    mapping(address => Account) internal _accounts;
     mapping(address => Profile) internal _profiles;
-    address[] internal _creatorList;
+    mapping(bytes32 => address) public usernameOwner;
+    address[] internal _people;
 
-    mapping(address => mapping(address => Position)) internal _positions;
+    mapping(address => mapping(address => Position)) internal _positions; // backer => creator
     mapping(address => address[]) internal _backersOf;
     mapping(address => mapping(address => uint256)) internal _backerIdx;
-    mapping(address => address[]) internal _backedBy;
-    mapping(address => mapping(address => uint256)) internal _creatorIdx;
+    mapping(address => address[]) internal _backing; // backer => creators they back
+    mapping(address => mapping(address => uint256)) internal _backingIdx;
 
     Activity[] internal _activity;
-    mapping(address => uint256[]) internal _creatorActivity; // everything involving a creator
+    mapping(address => uint256[]) internal _inbox; // activity ids that concern an account
     uint256[] internal _posts;
-    mapping(address => uint256[]) internal _creatorPosts;
-    mapping(uint256 => uint256[]) internal _comments; // post id => comment activity ids
-    mapping(uint256 => PostStats) internal _postStats;
-    mapping(address => bytes20[]) internal _casts;
-    mapping(address => mapping(bytes20 => CastView)) internal _castStats;
+    mapping(address => uint256[]) internal _postsBy;
 
     // ---------------------------------------------------------------------
     // Events / errors
     // ---------------------------------------------------------------------
 
-    event CreatorRegistered(address indexed creator, string name);
-    event ProfileUpdated(address indexed creator);
-    event Backed(address indexed backer, address indexed creator, uint256 amount, uint256 newPrincipal, uint64 endsAt, uint64 lockedUntil);
+    event ProfileSaved(address indexed account, string username);
+    event Backed(address indexed backer, address indexed creator, uint256 amount, address indexed referrer);
     event Unbacked(address indexed backer, address indexed creator, uint256 principal, uint256 paid);
-    event Closed(address indexed backer, address indexed creator, address indexed by, uint256 paid);
     event Claimed(address indexed creator, uint256 amount);
     event YieldSynced(uint256 newYield, uint256 accYieldPerPrincipal);
-    event ReserveChanged(uint256 reserve);
-    event ActivityAdded(uint256 indexed id, Kind indexed kind, address indexed creator);
+    event ActivityAdded(uint256 indexed id, Kind indexed kind, address indexed subject);
 
-    error NotRegistered();
-    error AlreadyRegistered();
+    error NoProfile();
     error InvalidProfile();
+    error UsernameTaken();
     error AmountTooSmall();
     error InsufficientPrincipal();
     error CannotBackSelf();
@@ -211,12 +156,6 @@ contract Backing is ReentrancyGuard {
     error NothingToClaim();
     error VaultAssetMismatch();
     error InvalidPost();
-    error NoteTooLong();
-    error InvalidComment();
-    error UnknownPost();
-    error InvalidDuration();
-    error Locked(uint64 until);
-    error NotEnded();
     error DepositLoss();
 
     constructor(IERC4626 vault_, uint64 epochLength_, uint256 minBack_) {
@@ -228,159 +167,118 @@ contract Backing is ReentrancyGuard {
     }
 
     // ---------------------------------------------------------------------
-    // Profiles, posts, comments
+    // Profiles and posts
     // ---------------------------------------------------------------------
 
-    function registerCreator(Profile calldata p) external {
-        Creator storage c = _creators[msg.sender];
-        if (c.registered) revert AlreadyRegistered();
-        _validateProfile(p);
-        c.registered = true;
-        c.registeredAt = uint64(block.timestamp);
-        c.accDebt = accYieldPerPrincipal;
+    /// @notice Create or update your profile. Usernames are unique.
+    function saveProfile(Profile calldata p) external {
+        _validate(p);
+        bytes32 key = keccak256(bytes(p.username));
+        address owner = usernameOwner[key];
+        if (owner != address(0) && owner != msg.sender) revert UsernameTaken();
+
+        Account storage a = _accounts[msg.sender];
+        if (!a.exists) {
+            a.exists = true;
+            a.joinedAt = uint64(block.timestamp);
+            a.accDebt = accYieldPerPrincipal;
+            _people.push(msg.sender);
+            _log(Kind.Joined, msg.sender, msg.sender, address(0), 0, "", "");
+        } else {
+            bytes32 old = keccak256(bytes(_profiles[msg.sender].username));
+            if (old != key) delete usernameOwner[old];
+        }
+        usernameOwner[key] = msg.sender;
         _profiles[msg.sender] = p;
-        _creatorList.push(msg.sender);
-        emit CreatorRegistered(msg.sender, p.name);
-        _log(Kind.Joined, msg.sender, msg.sender, 0, bytes20(0), 0, "", "", "");
+        emit ProfileSaved(msg.sender, p.username);
     }
 
-    function updateProfile(Profile calldata p) external {
-        if (!_creators[msg.sender].registered) revert NotRegistered();
-        _validateProfile(p);
-        _profiles[msg.sender] = p;
-        emit ProfileUpdated(msg.sender);
+    function _validate(Profile calldata p) internal pure {
+        bytes calldata u = bytes(p.username);
+        if (u.length < 3 || u.length > 20) revert InvalidProfile();
+        for (uint256 i; i < u.length; i++) {
+            bytes1 ch = u[i];
+            bool ok = (ch >= 0x61 && ch <= 0x7a) || (ch >= 0x30 && ch <= 0x39) || ch == 0x5f; // a-z 0-9 _
+            if (!ok) revert InvalidProfile();
+        }
+        if (bytes(p.baseName).length > 64 || bytes(p.avatar).length > 256 || bytes(p.bio).length > 280 || bytes(p.link).length > 120) {
+            revert InvalidProfile();
+        }
     }
 
-    function _validateProfile(Profile calldata p) internal pure {
-        uint256 n = bytes(p.name).length;
-        if (
-            n == 0 || n > 48 || bytes(p.bio).length > 280 || bytes(p.avatar).length > 256 || bytes(p.banner).length > 256
-                || bytes(p.handle).length > 32 || bytes(p.x).length > 32 || bytes(p.xPost).length > 32
-        ) revert InvalidProfile();
-    }
-
-    /// @notice Post to your backers. Text up to 280 bytes, an optional link (e.g. one of your X
-    ///         posts) and an optional picture URL. Public and permanent.
-    function post(string calldata text, string calldata link, string calldata image) external returns (uint256 id) {
-        if (!_creators[msg.sender].registered) revert NotRegistered();
+    /// @notice Post to the feed: text up to 280 bytes and/or a picture URL.
+    function post(string calldata text, string calldata image) external returns (uint256 id) {
+        if (!_accounts[msg.sender].exists) revert NoProfile();
         uint256 n = bytes(text).length;
-        if (n > 280 || bytes(link).length > 256 || bytes(image).length > 256) revert InvalidPost();
-        if (n == 0 && bytes(link).length == 0 && bytes(image).length == 0) revert InvalidPost();
-        id = _log(Kind.Posted, msg.sender, msg.sender, 0, bytes20(0), 0, text, link, image);
+        if (n > 280 || bytes(image).length > 256 || (n == 0 && bytes(image).length == 0)) revert InvalidPost();
+        id = _log(Kind.Posted, msg.sender, msg.sender, address(0), 0, text, image);
         _posts.push(id);
-        _creatorPosts[msg.sender].push(id);
-    }
-
-    /// @notice Comment on a post. Anyone can comment.
-    function comment(uint256 postId, string calldata text) external returns (uint256 id) {
-        address creator = _postCreator(postId);
-        uint256 n = bytes(text).length;
-        if (n == 0 || n > 280) revert InvalidComment();
-        id = _log(Kind.Commented, msg.sender, creator, 0, bytes20(0), postId, text, "", "");
-        _comments[postId].push(id);
-        _postStats[postId].comments += 1;
-    }
-
-    function _postCreator(uint256 postId) internal view returns (address) {
-        if (postId == 0 || postId >= _activity.length || _activity[postId].kind != Kind.Posted) revert UnknownPost();
-        return _activity[postId].creator;
+        _postsBy[msg.sender].push(id);
     }
 
     // ---------------------------------------------------------------------
     // Backing
     // ---------------------------------------------------------------------
 
-    /// @notice Back `creator` with `amount`. Requires prior approval of the asset.
-    function back(address creator, uint256 amount, BackOptions calldata o) external nonReentrant {
-        Creator storage c = _creators[creator];
-        if (!c.registered) revert NotRegistered();
+    /// @notice Back `creator` with `amount` (approve the asset first). `referrer` is whoever shared
+    ///         the invite link that brought you here, or zero.
+    function back(address creator, uint256 amount, address referrer) external nonReentrant {
+        Account storage c = _accounts[creator];
+        if (!c.exists) revert NoProfile();
         if (creator == msg.sender) revert CannotBackSelf();
         if (amount < minBack) revert AmountTooSmall();
-        if (bytes(o.note).length > 140) revert NoteTooLong();
-        if (o.duration > MAX_DURATION || (o.lock && o.duration == 0)) revert InvalidDuration();
-        if (o.post != 0 && _postCreator(o.post) != creator) revert UnknownPost();
+        if (referrer == msg.sender || !_accounts[referrer].exists) referrer = address(0);
 
         _sync();
         _settleCreator(c);
         Position storage p = _positions[msg.sender][creator];
-        _settlePosition(p, c);
+        _settlePosition(p);
 
         if (p.principal == 0) {
             p.since = uint64(block.timestamp);
-            p.endsAt = 0;
-            p.lockedUntil = 0;
-            _addLink(msg.sender, creator);
+            _link(msg.sender, creator);
+            if (referrer != address(0)) _accounts[referrer].referred += 1;
         }
-
-        // Terms apply to the whole position. A lock can only be extended, never shortened.
-        uint64 until = o.duration == 0 ? 0 : uint64(block.timestamp) + o.duration;
-        if (o.lock && until > p.lockedUntil) p.lockedUntil = until;
-        if (until == 0) p.endsAt = 0;
-        else p.endsAt = until > p.lockedUntil ? until : p.lockedUntil;
 
         asset.safeTransferFrom(msg.sender, address(this), amount);
         asset.forceApprove(address(vault), amount);
         uint256 shares = vault.deposit(amount, address(this));
-        // Refuse deposits that lose value to a manipulated share price (ERC-4626 inflation attack).
         if (vault.previewRedeem(shares) + amount / 100_000 + 2 < amount) revert DepositLoss();
 
         p.principal += amount;
         c.principal += amount;
         totalPrincipal += amount;
 
-        emit Backed(msg.sender, creator, amount, p.principal, p.endsAt, p.lockedUntil);
-        _log(Kind.Backed, msg.sender, creator, amount, o.cast, o.post, o.note, "", "");
-
-        if (o.cast != bytes20(0)) {
-            CastView storage cv = _castStats[creator][o.cast];
-            if (cv.backings == 0) {
-                cv.cast = o.cast;
-                _casts[creator].push(o.cast);
-            }
-            cv.backed += amount;
-            cv.backings += 1;
-        }
-        if (o.post != 0) {
-            PostStats storage ps = _postStats[o.post];
-            ps.backed += SafeCast.toUint128(amount);
-            ps.backings += 1;
-        }
+        emit Backed(msg.sender, creator, amount, referrer);
+        uint256 id = _log(Kind.Backed, msg.sender, creator, referrer, amount, "", "");
+        if (referrer != address(0) && referrer != creator) _inbox[referrer].push(id);
 
         uint8 m = c.milestones;
         while (m < MILESTONE_COUNT && c.principal >= _milestone(m)) {
-            _log(Kind.Milestone, creator, creator, _milestone(m), bytes20(0), 0, "", "", "");
+            _log(Kind.Milestone, creator, creator, address(0), _milestone(m), "", "");
             m++;
         }
         c.milestones = m;
     }
 
-    /// @notice Withdraw `amount` of your principal. Not possible while locked.
+    /// @notice Withdraw part of your principal. Always allowed.
     function unback(address creator, uint256 amount) external nonReentrant {
-        _exit(msg.sender, creator, amount, false);
+        _exit(creator, amount);
     }
 
-    /// @notice Withdraw all of your principal. Not possible while locked.
+    /// @notice Withdraw all of your principal from `creator`.
     function unbackAll(address creator) external nonReentrant {
-        _exit(msg.sender, creator, _positions[msg.sender][creator].principal, false);
+        _exit(creator, _positions[msg.sender][creator].principal);
     }
 
-    /// @notice End a timed backing that has run its course. Anyone can call it (the app does it
-    ///         for you); the principal always goes back to the backer.
-    function close(address backer, address creator) external nonReentrant {
-        Position storage p = _positions[backer][creator];
-        if (p.principal == 0 || p.endsAt == 0 || block.timestamp < p.endsAt) revert NotEnded();
-        _exit(backer, creator, p.principal, true);
-    }
-
-    function _exit(address backer, address creator, uint256 amount, bool isClose) internal {
-        Position storage p = _positions[backer][creator];
+    function _exit(address creator, uint256 amount) internal {
+        Position storage p = _positions[msg.sender][creator];
         if (amount == 0 || amount > p.principal) revert InsufficientPrincipal();
-        if (!isClose && block.timestamp < p.lockedUntil) revert Locked(p.lockedUntil);
-        Creator storage c = _creators[creator];
+        Account storage c = _accounts[creator];
 
         _sync();
         _settleCreator(c);
-        _settlePosition(p, c);
+        _settlePosition(p);
 
         uint256 pay = _shareOfValue(amount);
         p.principal -= amount;
@@ -388,44 +286,37 @@ contract Backing is ReentrancyGuard {
         totalPrincipal -= amount;
         if (p.principal == 0) {
             p.since = 0;
-            p.endsAt = 0;
-            p.lockedUntil = 0;
-            _removeLink(backer, creator);
+            _unlink(msg.sender, creator);
         }
-
-        pay = _withdrawFromVault(pay, backer);
-        if (isClose) {
-            emit Closed(backer, creator, msg.sender, pay);
-            _log(Kind.Ended, backer, creator, amount, bytes20(0), 0, "", "", "");
-        } else {
-            emit Unbacked(backer, creator, amount, pay);
-        }
+        pay = _withdraw(pay, msg.sender);
+        emit Unbacked(msg.sender, creator, amount, pay);
+        _log(Kind.Unbacked, msg.sender, creator, address(0), amount, "", "");
     }
 
     // ---------------------------------------------------------------------
-    // Creator claims (epoch-based)
+    // Claims (epoch-based)
     // ---------------------------------------------------------------------
 
     function claim() external nonReentrant returns (uint256 amount) {
-        Creator storage c = _creators[msg.sender];
-        if (!c.registered) revert NotRegistered();
+        Account storage c = _accounts[msg.sender];
+        if (!c.exists) revert NoProfile();
         uint64 next = _nextClaimAt(c);
         if (block.timestamp < next) revert EpochNotOver(next);
 
         _sync();
         _settleCreator(c);
-        uint256 owedToCreator = c.accrued;
-        if (owedToCreator == 0) revert NothingToClaim();
+        uint256 owed = c.accrued;
+        if (owed == 0) revert NothingToClaim();
 
-        uint256 pay = _shareOfValue(owedToCreator);
+        uint256 pay = _shareOfValue(owed);
         c.accrued = 0;
         c.lastClaimAt = uint64(block.timestamp);
-        c.totalClaimed += owedToCreator;
-        totalClaimed += owedToCreator;
+        c.totalClaimed += owed;
+        totalClaimed += owed;
 
-        amount = _withdrawFromVault(pay, msg.sender);
+        amount = _withdraw(pay, msg.sender);
         emit Claimed(msg.sender, amount);
-        _log(Kind.Claimed, msg.sender, msg.sender, amount, bytes20(0), 0, "", "", "");
+        _log(Kind.Claimed, msg.sender, msg.sender, address(0), amount, "", "");
     }
 
     /// @notice Anyone can push accrued vault yield into the accounting.
@@ -437,7 +328,7 @@ contract Backing is ReentrancyGuard {
     // Internal accounting
     // ---------------------------------------------------------------------
 
-    function _currentValue() internal view returns (uint256) {
+    function _value() internal view returns (uint256) {
         return vault.convertToAssets(vault.balanceOf(address(this)));
     }
 
@@ -445,86 +336,58 @@ contract Backing is ReentrancyGuard {
         return totalPrincipal + (totalDistributed - totalClaimed);
     }
 
-    /// @dev Yield not yet distributed, and what the reserve should be after a sync.
+    /// @dev Undistributed yield, and what the reserve should be after a sync.
     function _pending() internal view returns (uint256 yield_, uint256 newReserve) {
-        uint256 value = _currentValue();
+        uint256 value = _value();
         uint256 users = _owedToUsers();
-        if (value <= users) return (0, 0); // loss (or flat): the reserve is gone first
+        if (value <= users) return (0, 0); // a loss: the reserve is used up first
         uint256 surplus = value - users;
-        if (surplus <= reserve) return (0, surplus); // reserve absorbed part of a loss
-        if (totalPrincipal == 0) return (0, surplus); // nobody to attribute it to: it all goes to reserve
+        if (surplus <= reserve || totalPrincipal == 0) return (0, surplus);
         return (surplus - reserve, reserve);
     }
 
     function _sync() internal {
         (uint256 y, uint256 r) = _pending();
-        if (r != reserve) {
-            reserve = r;
-            emit ReserveChanged(r);
-        }
+        reserve = r;
         if (y == 0) return;
         accYieldPerPrincipal += (y * PRECISION) / totalPrincipal;
         totalDistributed += y;
         emit YieldSynced(y, accYieldPerPrincipal);
     }
 
-    /// @dev What `amount` of user claims is actually worth if the vault holds less than it owes.
-    ///      Everyone exiting while the vault is short takes the same haircut.
+    /// @dev If the vault holds less than it owes, every exit gets the same haircut.
     function _shareOfValue(uint256 amount) internal view returns (uint256) {
         uint256 users = _owedToUsers();
-        uint256 value = _currentValue();
+        uint256 value = _value();
         if (value >= users || users == 0) return amount;
         return (amount * value) / users;
     }
 
-    function _settleCreator(Creator storage c) internal {
+    function _settleCreator(Account storage c) internal {
         uint256 acc = accYieldPerPrincipal;
         if (c.principal > 0) c.accrued += (c.principal * (acc - c.accDebt)) / PRECISION;
         c.accDebt = acc;
     }
 
-    /// @dev Call after _settleCreator. Credits the position with what it earned since it was last
-    ///      settled, minus anything earned after it ended, which moves from the creator to the reserve.
-    function _settlePosition(Position storage p, Creator storage c) internal {
+    function _settlePosition(Position storage p) internal {
         uint256 acc = accYieldPerPrincipal;
-        uint64 nowTs = uint64(block.timestamp);
-        if (p.principal > 0) {
-            uint256 earned = (p.principal * (acc - p.accDebt)) / PRECISION;
-            uint256 excess;
-            if (earned > 0 && p.endsAt != 0 && nowTs > p.endsAt) {
-                uint64 from = p.settledAt > p.endsAt ? p.settledAt : p.endsAt;
-                uint256 span = nowTs - p.settledAt;
-                excess = span == 0 ? 0 : (earned * (nowTs - from)) / span;
-                if (excess > c.accrued) excess = c.accrued; // the creator may already have claimed it
-                if (excess > 0) {
-                    c.accrued -= excess;
-                    // the creator's share was counted as distributed; hand it back to the reserve
-                    totalDistributed -= excess;
-                    reserve += excess;
-                    emit ReserveChanged(reserve);
-                }
-            }
-            p.yieldGenerated += earned - excess;
-        }
+        if (p.principal > 0) p.yieldGenerated += (p.principal * (acc - p.accDebt)) / PRECISION;
         p.accDebt = acc;
-        p.settledAt = nowTs;
     }
 
     /// @dev Withdraws `amount` to `to`; if vault rounding leaves us a few wei short, redeems what's left.
-    function _withdrawFromVault(uint256 amount, address to) internal returns (uint256) {
+    function _withdraw(uint256 amount, address to) internal returns (uint256) {
         if (amount == 0) return 0;
-        uint256 sharesNeeded = vault.previewWithdraw(amount);
         uint256 shares = vault.balanceOf(address(this));
-        if (sharesNeeded <= shares) {
+        if (vault.previewWithdraw(amount) <= shares) {
             vault.withdraw(amount, to, address(this));
             return amount;
         }
         return vault.redeem(shares, to, address(this));
     }
 
-    function _nextClaimAt(Creator storage c) internal view returns (uint64) {
-        if (c.lastClaimAt == 0) return 0;
-        return c.lastClaimAt + epochLength;
+    function _nextClaimAt(Account storage c) internal view returns (uint64) {
+        return c.lastClaimAt == 0 ? 0 : c.lastClaimAt + epochLength;
     }
 
     /// @dev 100, 1k, 5k, 10k, 50k, 100k, 500k, 1M whole units (6 decimals)
@@ -533,46 +396,37 @@ contract Backing is ReentrancyGuard {
         return uint256(whole[i]) * 1e6;
     }
 
-    function _log(
-        Kind kind,
-        address actor,
-        address creator,
-        uint256 amount,
-        bytes20 cast,
-        uint256 ref,
-        string memory text,
-        string memory link,
-        string memory image
-    ) internal returns (uint256 id) {
+    function _log(Kind kind, address actor, address subject, address referrer, uint256 amount, string memory text, string memory image)
+        internal
+        returns (uint256 id)
+    {
         id = _activity.length;
         _activity.push(
             Activity({
                 kind: kind,
                 actor: actor,
-                creator: creator,
+                subject: subject,
+                referrer: referrer,
                 amount: SafeCast.toUint96(amount),
                 time: uint40(block.timestamp),
-                cast: cast,
-                ref: ref,
                 text: text,
-                link: link,
                 image: image
             })
         );
-        _creatorActivity[creator].push(id);
-        emit ActivityAdded(id, kind, creator);
+        _inbox[subject].push(id);
+        emit ActivityAdded(id, kind, subject);
     }
 
-    function _addLink(address backer, address creator) internal {
+    function _link(address backer, address creator) internal {
         _backersOf[creator].push(backer);
         _backerIdx[creator][backer] = _backersOf[creator].length;
-        _backedBy[backer].push(creator);
-        _creatorIdx[backer][creator] = _backedBy[backer].length;
+        _backing[backer].push(creator);
+        _backingIdx[backer][creator] = _backing[backer].length;
     }
 
-    function _removeLink(address backer, address creator) internal {
+    function _unlink(address backer, address creator) internal {
         _swapPop(_backersOf[creator], _backerIdx[creator], backer);
-        _swapPop(_backedBy[backer], _creatorIdx[backer], creator);
+        _swapPop(_backing[backer], _backingIdx[backer], creator);
     }
 
     function _swapPop(address[] storage list, mapping(address => uint256) storage idx, address item) private {
@@ -597,172 +451,99 @@ contract Backing is ReentrancyGuard {
         return accYieldPerPrincipal + (y * PRECISION) / totalPrincipal;
     }
 
-    function claimable(address creator) public view returns (uint256) {
-        Creator storage c = _creators[creator];
+    function claimable(address account) public view returns (uint256) {
+        Account storage c = _accounts[account];
         return c.accrued + (c.principal * (currentAcc() - c.accDebt)) / PRECISION;
     }
 
-    function creatorCount() external view returns (uint256) {
-        return _creatorList.length;
+    function hasProfile(address account) external view returns (bool) {
+        return _accounts[account].exists;
     }
 
-    function isCreator(address account) external view returns (bool) {
-        return _creators[account].registered;
+    function peopleCount() external view returns (uint256) {
+        return _people.length;
     }
 
-    function getCreator(address creator) public view returns (CreatorView memory v) {
-        Creator storage c = _creators[creator];
-        Profile storage pr = _profiles[creator];
-        uint256 cl = c.registered ? claimable(creator) : 0;
-        v.creator = creator;
-        v.name = pr.name;
-        v.bio = pr.bio;
-        v.avatar = pr.avatar;
-        v.banner = pr.banner;
-        v.handle = pr.handle;
-        v.fid = pr.fid;
-        v.x = pr.x;
-        v.xPost = pr.xPost;
-        v.registeredAt = c.registeredAt;
-        v.lastClaimAt = c.lastClaimAt;
+    function getProfile(address account) public view returns (ProfileView memory v) {
+        Account storage c = _accounts[account];
+        uint256 cl = c.exists ? claimable(account) : 0;
+        v.account = account;
+        v.profile = _profiles[account];
+        v.joinedAt = c.joinedAt;
         v.nextClaimAt = _nextClaimAt(c);
         v.principal = c.principal;
-        v.backerCount = _backersOf[creator].length;
+        v.backerCount = _backersOf[account].length;
+        v.backingCount = _backing[account].length;
         v.claimable = cl;
         v.totalClaimed = c.totalClaimed;
         v.totalEarned = c.totalClaimed + cl;
-        v.postCount = _creatorPosts[creator].length;
-        v.castCount = _casts[creator].length;
+        v.postCount = _postsBy[account].length;
+        v.referred = c.referred;
     }
 
-    function getCreators(uint256 offset, uint256 limit) external view returns (CreatorView[] memory out) {
-        uint256 n = _creatorList.length;
-        if (offset >= n) return new CreatorView[](0);
+    function getProfileByUsername(string calldata username) external view returns (ProfileView memory) {
+        return getProfile(usernameOwner[keccak256(bytes(username))]);
+    }
+
+    function getPeople(uint256 offset, uint256 limit) external view returns (ProfileView[] memory out) {
+        uint256 n = _people.length;
+        if (offset >= n) return new ProfileView[](0);
         uint256 end = offset + limit > n ? n : offset + limit;
-        out = new CreatorView[](end - offset);
-        for (uint256 i = offset; i < end; i++) {
-            out[i - offset] = getCreator(_creatorList[i]);
-        }
+        out = new ProfileView[](end - offset);
+        for (uint256 i = offset; i < end; i++) out[i - offset] = getProfile(_people[i]);
     }
 
-    function getBackers(address creator) external view returns (BackerView[] memory out) {
-        address[] storage list = _backersOf[creator];
-        out = new BackerView[](list.length);
-        uint256 acc = currentAcc();
-        for (uint256 i; i < list.length; i++) {
-            Position storage p = _positions[list[i]][creator];
-            out[i] = BackerView({
-                backer: list[i],
-                principal: p.principal,
-                generated: p.yieldGenerated + (p.principal * (acc - p.accDebt)) / PRECISION,
-                endsAt: p.endsAt,
-                lockedUntil: p.lockedUntil
-            });
-        }
-    }
-
-    function getPosition(address backer, address creator) public view returns (PositionView memory v) {
+    function getPosition(address backer, address creator) public view returns (PositionView memory) {
         Position storage p = _positions[backer][creator];
-        Profile storage pr = _profiles[creator];
-        v = PositionView({
+        return PositionView({
+            backer: backer,
             creator: creator,
-            creatorName: pr.name,
-            creatorAvatar: pr.avatar,
             principal: p.principal,
             yieldGenerated: p.yieldGenerated + (p.principal * (currentAcc() - p.accDebt)) / PRECISION,
-            since: p.since,
-            endsAt: p.endsAt,
-            lockedUntil: p.lockedUntil
+            since: p.since
         });
     }
 
-    function getPositions(address backer) external view returns (PositionView[] memory out) {
-        address[] storage list = _backedBy[backer];
+    /// @notice Everyone backing `creator`.
+    function getBackers(address creator) external view returns (PositionView[] memory out) {
+        address[] storage list = _backersOf[creator];
         out = new PositionView[](list.length);
-        for (uint256 i; i < list.length; i++) {
-            out[i] = getPosition(backer, list[i]);
-        }
+        for (uint256 i; i < list.length; i++) out[i] = getPosition(list[i], creator);
     }
 
-    function activityCount() external view returns (uint256) {
-        return _activity.length;
+    /// @notice Everyone `backer` is backing.
+    function getBacking(address backer) external view returns (PositionView[] memory out) {
+        address[] storage list = _backing[backer];
+        out = new PositionView[](list.length);
+        for (uint256 i; i < list.length; i++) out[i] = getPosition(backer, list[i]);
     }
 
-    /// @notice Newest-first page of everything that involves `creator` (their notifications).
-    function getCreatorActivity(address creator, uint256 offset, uint256 limit)
-        external
-        view
-        returns (uint256[] memory ids, Activity[] memory items)
-    {
-        return _page(_creatorActivity[creator], offset, limit);
+    /// @notice Newest-first page of all posts.
+    function getPosts(uint256 offset, uint256 limit) external view returns (uint256[] memory, Activity[] memory) {
+        return _page(_posts, offset, limit);
     }
 
-    /// @notice Newest-first page of all posts, with their stats.
-    function getPosts(uint256 offset, uint256 limit)
-        external
-        view
-        returns (uint256[] memory ids, Activity[] memory items, PostStats[] memory stats)
-    {
-        (ids, items) = _page(_posts, offset, limit);
-        stats = _statsFor(ids);
+    function getPostsBy(address account, uint256 offset, uint256 limit) external view returns (uint256[] memory, Activity[] memory) {
+        return _page(_postsBy[account], offset, limit);
     }
 
-    function getCreatorPosts(address creator, uint256 offset, uint256 limit)
-        external
-        view
-        returns (uint256[] memory ids, Activity[] memory items, PostStats[] memory stats)
-    {
-        (ids, items) = _page(_creatorPosts[creator], offset, limit);
-        stats = _statsFor(ids);
+    /// @notice Newest-first page of everything that concerns `account`: their notifications.
+    function getInbox(address account, uint256 offset, uint256 limit) external view returns (uint256[] memory, Activity[] memory) {
+        return _page(_inbox[account], offset, limit);
     }
 
-    function getPost(uint256 postId) external view returns (Activity memory item, PostStats memory stats) {
-        _postCreator(postId);
-        return (_activity[postId], _postStats[postId]);
-    }
-
-    /// @notice Oldest-first page of a post's comments.
-    function getComments(uint256 postId, uint256 offset, uint256 limit)
-        external
-        view
-        returns (uint256[] memory ids, Activity[] memory items)
-    {
-        uint256[] storage list = _comments[postId];
-        uint256 n = list.length;
-        if (offset >= n) return (new uint256[](0), new Activity[](0));
-        uint256 count = n - offset < limit ? n - offset : limit;
-        ids = new uint256[](count);
-        items = new Activity[](count);
-        for (uint256 i; i < count; i++) {
-            ids[i] = list[offset + i];
-            items[i] = _activity[ids[i]];
-        }
-    }
-
-    function getCasts(address creator) external view returns (CastView[] memory out) {
-        bytes20[] storage list = _casts[creator];
-        out = new CastView[](list.length);
-        for (uint256 i; i < list.length; i++) {
-            out[i] = _castStats[creator][list[i]];
-        }
-    }
-
-    function stats() external view returns (uint256 principal, uint256 creators, uint256 yieldDistributed, uint256 yieldClaimed) {
+    function stats() external view returns (uint256 principal, uint256 people, uint256 yieldDistributed, uint256 yieldClaimed) {
         (uint256 y,) = _pending();
-        return (totalPrincipal, _creatorList.length, totalDistributed + y, totalClaimed);
+        return (totalPrincipal, _people.length, totalDistributed + y, totalClaimed);
     }
 
-    /// @notice Vault value vs what is owed, for anyone checking solvency.
+    /// @notice Vault value vs what is owed, so anyone can check solvency.
     function health() external view returns (uint256 value, uint256 owedToUsers, uint256 reserve_) {
         (, reserve_) = _pending();
-        return (_currentValue(), _owedToUsers(), reserve_);
+        return (_value(), _owedToUsers(), reserve_);
     }
 
-    function _page(uint256[] storage list, uint256 offset, uint256 limit)
-        internal
-        view
-        returns (uint256[] memory ids, Activity[] memory items)
-    {
+    function _page(uint256[] storage list, uint256 offset, uint256 limit) internal view returns (uint256[] memory ids, Activity[] memory items) {
         uint256 n = list.length;
         if (offset >= n) return (new uint256[](0), new Activity[](0));
         uint256 count = n - offset < limit ? n - offset : limit;
@@ -772,13 +553,6 @@ contract Backing is ReentrancyGuard {
             uint256 id = list[n - 1 - offset - i];
             ids[i] = id;
             items[i] = _activity[id];
-        }
-    }
-
-    function _statsFor(uint256[] memory ids) internal view returns (PostStats[] memory out) {
-        out = new PostStats[](ids.length);
-        for (uint256 i; i < ids.length; i++) {
-            out[i] = _postStats[ids[i]];
         }
     }
 }

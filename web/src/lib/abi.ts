@@ -23,33 +23,7 @@ export const backingAbi = [
   },
   {
     "type": "function",
-    "name": "MAX_DURATION",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "accYieldPerPrincipal",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "activityCount",
     "inputs": [],
     "outputs": [
       {
@@ -88,36 +62,9 @@ export const backingAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "o",
-        "type": "tuple",
-        "internalType": "struct Backing.BackOptions",
-        "components": [
-          {
-            "name": "duration",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "lock",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "cast",
-            "type": "bytes20",
-            "internalType": "bytes20"
-          },
-          {
-            "name": "post",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "note",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
+        "name": "referrer",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -141,66 +88,11 @@ export const backingAbi = [
     "name": "claimable",
     "inputs": [
       {
-        "name": "creator",
+        "name": "account",
         "type": "address",
         "internalType": "address"
       }
     ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "close",
-    "inputs": [
-      {
-        "name": "backer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "creator",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "comment",
-    "inputs": [
-      {
-        "name": "postId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "text",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "id",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "creatorCount",
-    "inputs": [],
     "outputs": [
       {
         "name": "",
@@ -250,7 +142,7 @@ export const backingAbi = [
       {
         "name": "out",
         "type": "tuple[]",
-        "internalType": "struct Backing.BackerView[]",
+        "internalType": "struct Backing.PositionView[]",
         "components": [
           {
             "name": "backer",
@@ -258,22 +150,22 @@ export const backingAbi = [
             "internalType": "address"
           },
           {
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "principal",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "generated",
+            "name": "yieldGenerated",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "endsAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "lockedUntil",
+            "name": "since",
             "type": "uint64",
             "internalType": "uint64"
           }
@@ -284,10 +176,10 @@ export const backingAbi = [
   },
   {
     "type": "function",
-    "name": "getCasts",
+    "name": "getBacking",
     "inputs": [
       {
-        "name": "creator",
+        "name": "backer",
         "type": "address",
         "internalType": "address"
       }
@@ -296,22 +188,32 @@ export const backingAbi = [
       {
         "name": "out",
         "type": "tuple[]",
-        "internalType": "struct Backing.CastView[]",
+        "internalType": "struct Backing.PositionView[]",
         "components": [
           {
-            "name": "cast",
-            "type": "bytes20",
-            "internalType": "bytes20"
+            "name": "backer",
+            "type": "address",
+            "internalType": "address"
           },
           {
-            "name": "backed",
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "principal",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "backings",
+            "name": "yieldGenerated",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "since",
+            "type": "uint64",
+            "internalType": "uint64"
           }
         ]
       }
@@ -320,12 +222,12 @@ export const backingAbi = [
   },
   {
     "type": "function",
-    "name": "getComments",
+    "name": "getInbox",
     "inputs": [
       {
-        "name": "postId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
       },
       {
         "name": "offset",
@@ -340,12 +242,12 @@ export const backingAbi = [
     ],
     "outputs": [
       {
-        "name": "ids",
+        "name": "",
         "type": "uint256[]",
         "internalType": "uint256[]"
       },
       {
-        "name": "items",
+        "name": "",
         "type": "tuple[]",
         "internalType": "struct Backing.Activity[]",
         "components": [
@@ -360,7 +262,12 @@ export const backingAbi = [
             "internalType": "address"
           },
           {
-            "name": "creator",
+            "name": "subject",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "referrer",
             "type": "address",
             "internalType": "address"
           },
@@ -375,22 +282,7 @@ export const backingAbi = [
             "internalType": "uint40"
           },
           {
-            "name": "cast",
-            "type": "bytes20",
-            "internalType": "bytes20"
-          },
-          {
-            "name": "ref",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "text",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "link",
             "type": "string",
             "internalType": "string"
           },
@@ -406,72 +298,64 @@ export const backingAbi = [
   },
   {
     "type": "function",
-    "name": "getCreator",
+    "name": "getPeople",
     "inputs": [
       {
-        "name": "creator",
-        "type": "address",
-        "internalType": "address"
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [
       {
-        "name": "v",
-        "type": "tuple",
-        "internalType": "struct Backing.CreatorView",
+        "name": "out",
+        "type": "tuple[]",
+        "internalType": "struct Backing.ProfileView[]",
         "components": [
           {
-            "name": "creator",
+            "name": "account",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "name",
-            "type": "string",
-            "internalType": "string"
+            "name": "profile",
+            "type": "tuple",
+            "internalType": "struct Backing.Profile",
+            "components": [
+              {
+                "name": "username",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "baseName",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "avatar",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "bio",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "link",
+                "type": "string",
+                "internalType": "string"
+              }
+            ]
           },
           {
-            "name": "bio",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "avatar",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "banner",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "handle",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "fid",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "x",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "xPost",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "registeredAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "lastClaimAt",
+            "name": "joinedAt",
             "type": "uint64",
             "internalType": "uint64"
           },
@@ -487,6 +371,11 @@ export const backingAbi = [
           },
           {
             "name": "backerCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "backingCount",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -511,322 +400,7 @@ export const backingAbi = [
             "internalType": "uint256"
           },
           {
-            "name": "castCount",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getCreatorActivity",
-    "inputs": [
-      {
-        "name": "creator",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "offset",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "limit",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "ids",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      },
-      {
-        "name": "items",
-        "type": "tuple[]",
-        "internalType": "struct Backing.Activity[]",
-        "components": [
-          {
-            "name": "kind",
-            "type": "uint8",
-            "internalType": "enum Backing.Kind"
-          },
-          {
-            "name": "actor",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "creator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint96",
-            "internalType": "uint96"
-          },
-          {
-            "name": "time",
-            "type": "uint40",
-            "internalType": "uint40"
-          },
-          {
-            "name": "cast",
-            "type": "bytes20",
-            "internalType": "bytes20"
-          },
-          {
-            "name": "ref",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "text",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "link",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "image",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getCreatorPosts",
-    "inputs": [
-      {
-        "name": "creator",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "offset",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "limit",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "ids",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      },
-      {
-        "name": "items",
-        "type": "tuple[]",
-        "internalType": "struct Backing.Activity[]",
-        "components": [
-          {
-            "name": "kind",
-            "type": "uint8",
-            "internalType": "enum Backing.Kind"
-          },
-          {
-            "name": "actor",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "creator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint96",
-            "internalType": "uint96"
-          },
-          {
-            "name": "time",
-            "type": "uint40",
-            "internalType": "uint40"
-          },
-          {
-            "name": "cast",
-            "type": "bytes20",
-            "internalType": "bytes20"
-          },
-          {
-            "name": "ref",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "text",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "link",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "image",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
-      },
-      {
-        "name": "stats",
-        "type": "tuple[]",
-        "internalType": "struct Backing.PostStats[]",
-        "components": [
-          {
-            "name": "backed",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "backings",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "comments",
-            "type": "uint32",
-            "internalType": "uint32"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getCreators",
-    "inputs": [
-      {
-        "name": "offset",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "limit",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "out",
-        "type": "tuple[]",
-        "internalType": "struct Backing.CreatorView[]",
-        "components": [
-          {
-            "name": "creator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "name",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "bio",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "avatar",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "banner",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "handle",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "fid",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "x",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "xPost",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "registeredAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "lastClaimAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "nextClaimAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "principal",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "backerCount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "claimable",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalClaimed",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "totalEarned",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "postCount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "castCount",
+            "name": "referred",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -852,24 +426,19 @@ export const backingAbi = [
     ],
     "outputs": [
       {
-        "name": "v",
+        "name": "",
         "type": "tuple",
         "internalType": "struct Backing.PositionView",
         "components": [
           {
-            "name": "creator",
+            "name": "backer",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "creatorName",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "creatorAvatar",
-            "type": "string",
-            "internalType": "string"
+            "name": "creator",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "principal",
@@ -885,170 +454,6 @@ export const backingAbi = [
             "name": "since",
             "type": "uint64",
             "internalType": "uint64"
-          },
-          {
-            "name": "endsAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "lockedUntil",
-            "type": "uint64",
-            "internalType": "uint64"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getPositions",
-    "inputs": [
-      {
-        "name": "backer",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "out",
-        "type": "tuple[]",
-        "internalType": "struct Backing.PositionView[]",
-        "components": [
-          {
-            "name": "creator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "creatorName",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "creatorAvatar",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "principal",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "yieldGenerated",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "since",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "endsAt",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "lockedUntil",
-            "type": "uint64",
-            "internalType": "uint64"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getPost",
-    "inputs": [
-      {
-        "name": "postId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "item",
-        "type": "tuple",
-        "internalType": "struct Backing.Activity",
-        "components": [
-          {
-            "name": "kind",
-            "type": "uint8",
-            "internalType": "enum Backing.Kind"
-          },
-          {
-            "name": "actor",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "creator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint96",
-            "internalType": "uint96"
-          },
-          {
-            "name": "time",
-            "type": "uint40",
-            "internalType": "uint40"
-          },
-          {
-            "name": "cast",
-            "type": "bytes20",
-            "internalType": "bytes20"
-          },
-          {
-            "name": "ref",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "text",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "link",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "image",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
-      },
-      {
-        "name": "stats",
-        "type": "tuple",
-        "internalType": "struct Backing.PostStats",
-        "components": [
-          {
-            "name": "backed",
-            "type": "uint128",
-            "internalType": "uint128"
-          },
-          {
-            "name": "backings",
-            "type": "uint32",
-            "internalType": "uint32"
-          },
-          {
-            "name": "comments",
-            "type": "uint32",
-            "internalType": "uint32"
           }
         ]
       }
@@ -1072,12 +477,12 @@ export const backingAbi = [
     ],
     "outputs": [
       {
-        "name": "ids",
+        "name": "",
         "type": "uint256[]",
         "internalType": "uint256[]"
       },
       {
-        "name": "items",
+        "name": "",
         "type": "tuple[]",
         "internalType": "struct Backing.Activity[]",
         "components": [
@@ -1092,7 +497,12 @@ export const backingAbi = [
             "internalType": "address"
           },
           {
-            "name": "creator",
+            "name": "subject",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "referrer",
             "type": "address",
             "internalType": "address"
           },
@@ -1107,22 +517,7 @@ export const backingAbi = [
             "internalType": "uint40"
           },
           {
-            "name": "cast",
-            "type": "bytes20",
-            "internalType": "bytes20"
-          },
-          {
-            "name": "ref",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "text",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "link",
             "type": "string",
             "internalType": "string"
           },
@@ -1132,28 +527,317 @@ export const backingAbi = [
             "internalType": "string"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPostsBy",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "name": "stats",
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "",
         "type": "tuple[]",
-        "internalType": "struct Backing.PostStats[]",
+        "internalType": "struct Backing.Activity[]",
         "components": [
           {
-            "name": "backed",
-            "type": "uint128",
-            "internalType": "uint128"
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "enum Backing.Kind"
           },
           {
-            "name": "backings",
-            "type": "uint32",
-            "internalType": "uint32"
+            "name": "actor",
+            "type": "address",
+            "internalType": "address"
           },
           {
-            "name": "comments",
-            "type": "uint32",
-            "internalType": "uint32"
+            "name": "subject",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "referrer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint96",
+            "internalType": "uint96"
+          },
+          {
+            "name": "time",
+            "type": "uint40",
+            "internalType": "uint40"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "image",
+            "type": "string",
+            "internalType": "string"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProfile",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "v",
+        "type": "tuple",
+        "internalType": "struct Backing.ProfileView",
+        "components": [
+          {
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "profile",
+            "type": "tuple",
+            "internalType": "struct Backing.Profile",
+            "components": [
+              {
+                "name": "username",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "baseName",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "avatar",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "bio",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "link",
+                "type": "string",
+                "internalType": "string"
+              }
+            ]
+          },
+          {
+            "name": "joinedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "nextClaimAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "principal",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "backerCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "backingCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "claimable",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalClaimed",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalEarned",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "postCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "referred",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProfileByUsername",
+    "inputs": [
+      {
+        "name": "username",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Backing.ProfileView",
+        "components": [
+          {
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "profile",
+            "type": "tuple",
+            "internalType": "struct Backing.Profile",
+            "components": [
+              {
+                "name": "username",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "baseName",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "avatar",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "bio",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "link",
+                "type": "string",
+                "internalType": "string"
+              }
+            ]
+          },
+          {
+            "name": "joinedAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "nextClaimAt",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "principal",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "backerCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "backingCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "claimable",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalClaimed",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalEarned",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "postCount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "referred",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "hasProfile",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "stateMutability": "view"
@@ -1183,26 +867,20 @@ export const backingAbi = [
   },
   {
     "type": "function",
-    "name": "isCreator",
-    "inputs": [
-      {
-        "name": "account",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "name": "minBack",
+    "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "minBack",
+    "name": "peopleCount",
     "inputs": [],
     "outputs": [
       {
@@ -1223,11 +901,6 @@ export const backingAbi = [
         "internalType": "string"
       },
       {
-        "name": "link",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
         "name": "image",
         "type": "string",
         "internalType": "string"
@@ -1240,61 +913,6 @@ export const backingAbi = [
         "internalType": "uint256"
       }
     ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "registerCreator",
-    "inputs": [
-      {
-        "name": "p",
-        "type": "tuple",
-        "internalType": "struct Backing.Profile",
-        "components": [
-          {
-            "name": "name",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "bio",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "avatar",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "banner",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "handle",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "fid",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "x",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "xPost",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -1312,6 +930,46 @@ export const backingAbi = [
   },
   {
     "type": "function",
+    "name": "saveProfile",
+    "inputs": [
+      {
+        "name": "p",
+        "type": "tuple",
+        "internalType": "struct Backing.Profile",
+        "components": [
+          {
+            "name": "username",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "baseName",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "avatar",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "bio",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "link",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "stats",
     "inputs": [],
     "outputs": [
@@ -1321,7 +979,7 @@ export const backingAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "creators",
+        "name": "people",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -1417,58 +1075,22 @@ export const backingAbi = [
   },
   {
     "type": "function",
-    "name": "updateProfile",
+    "name": "usernameOwner",
     "inputs": [
       {
-        "name": "p",
-        "type": "tuple",
-        "internalType": "struct Backing.Profile",
-        "components": [
-          {
-            "name": "name",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "bio",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "avatar",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "banner",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "handle",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "fid",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "x",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "xPost",
-            "type": "string",
-            "internalType": "string"
-          }
-        ]
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -1500,7 +1122,7 @@ export const backingAbi = [
         "internalType": "enum Backing.Kind"
       },
       {
-        "name": "creator",
+        "name": "subject",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -1531,22 +1153,10 @@ export const backingAbi = [
         "internalType": "uint256"
       },
       {
-        "name": "newPrincipal",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "endsAt",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
-      },
-      {
-        "name": "lockedUntil",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
+        "name": "referrer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1572,76 +1182,19 @@ export const backingAbi = [
   },
   {
     "type": "event",
-    "name": "Closed",
+    "name": "ProfileSaved",
     "inputs": [
       {
-        "name": "backer",
+        "name": "account",
         "type": "address",
         "indexed": true,
         "internalType": "address"
       },
       {
-        "name": "creator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "by",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "paid",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "CreatorRegistered",
-    "inputs": [
-      {
-        "name": "creator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "name",
+        "name": "username",
         "type": "string",
         "indexed": false,
         "internalType": "string"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ProfileUpdated",
-    "inputs": [
-      {
-        "name": "creator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ReserveChanged",
-    "inputs": [
-      {
-        "name": "reserve",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1698,11 +1251,6 @@ export const backingAbi = [
   },
   {
     "type": "error",
-    "name": "AlreadyRegistered",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "AmountTooSmall",
     "inputs": []
   },
@@ -1734,16 +1282,6 @@ export const backingAbi = [
   },
   {
     "type": "error",
-    "name": "InvalidComment",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidDuration",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidPost",
     "inputs": []
   },
@@ -1754,28 +1292,7 @@ export const backingAbi = [
   },
   {
     "type": "error",
-    "name": "Locked",
-    "inputs": [
-      {
-        "name": "until",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotEnded",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotRegistered",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NoteTooLong",
+    "name": "NoProfile",
     "inputs": []
   },
   {
@@ -1817,7 +1334,7 @@ export const backingAbi = [
   },
   {
     "type": "error",
-    "name": "UnknownPost",
+    "name": "UsernameTaken",
     "inputs": []
   },
   {

@@ -4,54 +4,36 @@
 
 > Your capital works the night shift.
 
-Built for Vibestarter Vibeathon 02 ("Night shift"). It runs as a social website and as a **Base App mini app** from the same code, and it plugs into **X**.
+Built for Vibestarter Vibeathon 02 ("Night shift"). It runs as a website and as a **Base App mini app** from the same code.
 
 ## What you can do
 
-- **Sign in with a wallet.** No password: Base Account (Face ID or fingerprint), a browser wallet, or WalletConnect. Inside Base App you're signed in automatically.
-- **Home feed, like X.** *Everyone* and *Following* tabs. Following shows posts from creators you back. Every post has **Back** (where a like would be), **comments** and **share**.
-- **Back a creator** from any post or profile:
-  - pick an amount
-  - pick a length: 1 hour, 1 day, 1 week, 1 month, or ongoing
-  - optionally **lock** it for that length, as a stronger promise
-  - add a public note
+- **Connect a wallet.** Your wallet is your account: Base Account (Face ID or fingerprint), a browser wallet, or WalletConnect. Inside Base App you're connected automatically.
+- **Make a profile.** Username, Base name, picture, bio and a link.
+- **Feed.** *Everyone* shows every post. *People I back* shows posts from creators you back. Every post has a **Back** button.
+- **Post.** Text and a picture.
+- **Back someone.** Pick an amount of USDC. It goes into the vault; its yield goes to them. Withdraw all or some of it any time.
+- **Profiles.** Anyone's posts, a live earnings counter, who backs them, and who they back.
+- **Back them too.** After backing someone, share an invite link. Friends who back through it count on your profile as people you brought.
+- **Notifications.** Who backed you, who stopped, milestones, and who your invite brought.
+- **Search** people by username or Base name.
+- **Portfolio.** Your earnings and claims, everyone you back (with loyalty badges and withdraw), and how your income can grow.
+- **Security page** at `/security`, summarising how we tried to break the contract (see [SECURITY.md](SECURITY.md)).
 
-  Flexible backings can be withdrawn any time. When a timed backing ends, it can be closed and the money goes back to the fan.
-- **Comments.** Anyone signed in can comment. People who back that creator get a lit-window **Backer** badge.
-- **Notifications.** Who backed you, comments on your posts, milestones, and timed backings that have ended.
-- **Profiles, like X.** A banner, picture, bio, X link, stats, a live earnings counter, and tabs for **Posts**, **Backers** (with their notes) and **About**.
-- **Studio** for creators:
-  - claim yield each epoch
-  - **post with a picture**, a link, or **one of your X posts**
-  - upload a profile picture and banner
-  - **link your X account**
-- **Discover.** Search by name or **@X username**. If someone isn't on Backing yet, **Invite on X** opens a ready-made post tagging them.
-- **Base App.** Profile and post links show as cards with a "Back them" button. One-tap casting, haptics, and "Add to your apps".
-- **Security page** at `/security` summarising how we tried to break the contract (see [SECURITY.md](SECURITY.md)).
-
-Everything except picture uploads lives on-chain: profiles, posts, comments, backings and the activity feed. There's no database.
-
-## How X works here (no paid API)
-
-- **Link your X:** Studio gives you a short code (`bk-xxxxxxxx`). You post it from your X account and paste the post's link. Our server reads that public post through X's free oEmbed endpoint and checks the author and the code. Only your wallet can save the handle to your profile, so a match proves the same person controls both. Linked accounts get a check mark.
-- **X posts in the feed:** paste one of your X post links into a Backing post. It shows as a card with the post's text and a "View on X" link, and backers can Back you right from it.
-- **Invite on X / share on X** use X's standard "post" links.
-
-Pulling *all* of a creator's X posts in automatically would need X's paid developer API and a server. It's listed under "Coming next".
+Everything except pictures lives on-chain: profiles, posts, backings and notifications. There's no database.
 
 ## Repo layout
 
 ```
 contracts/            Foundry project
-  src/Backing.sol       staking, yield attribution, timed/locked backings, profiles, posts, comments, activity
+  src/Backing.sol       profiles, posts, backing, yield, claims, invites, activity
   src/mocks/            Test USDC (faucet) + demo ERC-4626 vault with sped-up yield. Testnet/local only
   script/Deploy.s.sol   MODE=demo (mocks) or MODE=live (real vault). Writes web/src/deployments/<chainId>.json
-  script/Seed.s.sol     4 sample creators, posts with pictures, comments and backings
-  test/                 43 tests: unit, attacks, fuzzing and invariants (see SECURITY.md)
+  script/Seed.s.sol     4 sample creators, 3 fans, posts with pictures and backings
+  test/                 34 tests: unit, attacks, fuzzing and invariants (see SECURITY.md)
 web/                  Next.js 15 + wagmi 2 + viem + Tailwind 4 + Farcaster mini app SDK
-  src/app/              / (feed), /discover, /notifications, /me, /creator (studio), /c/[address], /p/[id], /security
+  src/app/              / (feed), /search, /notifications, /portfolio, /profile/edit, /u/[name], /security
   src/app/api/upload    picture uploads (wallet-signed) to Vercel Blob
-  src/app/api/x/*       X post previews and X account linking, via X's public oEmbed
   src/app/api/card      share card image (3:2) for Base App and social previews
   public/demo/          four demo pictures used by the seed script
 scripts-local.sh      one-command local chain + deploy + seed
@@ -68,7 +50,7 @@ scripts-local.sh      one-command local chain + deploy + seed
 
 ```bash
 # terminal 1 (Git Bash): tests, then a local chain with sample data
-cd contracts && forge test        # 43 tests should pass
+cd contracts && forge test        # 34 tests should pass
 cd .. && MY_WALLET=0xYourWalletAddress bash scripts-local.sh
 
 # terminal 2 (PowerShell or any shell): the app
@@ -77,7 +59,7 @@ npm ci
 npm run dev                       # http://localhost:3000
 ```
 
-In your wallet, add a network with RPC `http://127.0.0.1:8545` and chain ID `31337`. Pick **Local** in the network menu, sign in with **Browser wallet**, and tap **Get 1,000 test USDC**.
+In your wallet, add a network with RPC `http://127.0.0.1:8545` and chain ID `31337`. Pick **Local** in the network menu, connect with **Browser wallet**, and tap **Get 1,000 test USDC** on the Feed. If your wallet complains about a nonce after you restart the local chain, clear its activity data for that network.
 
 - **Pictures in local dev** are saved in `web/public/uploads` (git-ignored). No Blob store is needed.
 - **Demo post pictures:** run the seed with `SEED_IMAGE_BASE=http://localhost:3000/demo` (the local script does this).
@@ -144,19 +126,20 @@ Submit at app.vibestarter.xyz/vibeathon/submit with the wallet you applied with,
 - **Tagline:** "Back creators with money you keep: your USDC stays yours, its yield pays them."
 - **Live URL:** your Vercel URL
 - **What to try:**
-  1. Sign in (Base Account works with a passkey), tap **Get 1,000 test USDC**.
-  2. On **Home**, open a post and tap **Back**. Pick 100 tUSDC, **1 week**, tick **Lock**, add a note. The post's Back count goes up and a window lights up on their profile.
-  3. Comment on the post. You get a **Backer** badge.
-  4. Open **Following**: it now shows that creator. Open **My backing** to see the lock.
-  5. Open **Studio**: create a profile, upload a picture, link your X, post with a picture, claim yield.
-  6. **Discover**: search an @X username that isn't on Backing and tap **Invite on X**.
+  1. Connect (Base Account works with a passkey) and tap **Get 1,000 test USDC** on the Feed.
+  2. Make a profile: username, picture, bio.
+  3. On the Feed, tap **Back** on a post. Back 100 tUSDC. Watch their earnings tick up on their profile.
+  4. Copy the **Back them too** invite link and open it in another wallet.
+  5. Post something with a picture.
+  6. Open **Portfolio**: your backing, withdraw some, and how your income can grow. Open **Notifications** and **Search**.
   7. Read **/security**: how we tried to break it.
 - **AI tools:** Claude (Cowork) for the contracts, app, tests and security testing, plus the [unslop](https://github.com/heydamir/unslop) design skill by Damir Sokolovsky for the visual pass.
 - **Optional:** repo link, a 60–90s video, a screenshot, your X handle, a Fundable score link.
 
 ## Coming next
 
-- Automatic import of creators' X posts (X developer API plus a server)
+- Comments, and timed or locked backings
+- Linking X accounts
 - Verified Base App identity with Quick Auth
 - Push notifications
 - An indexer for scale
@@ -165,7 +148,7 @@ Submit at app.vibestarter.xyz/vibeathon/submit with the wallet you applied with,
 
 ## Security
 
-See [SECURITY.md](SECURITY.md): 43 tests including 12 attack tests, fuzzing and invariants. Three issues were found and fixed during that testing. Unaudited: keep mainnet amounts small.
+See [SECURITY.md](SECURITY.md): 34 tests including 12 attack tests, fuzzing and invariants. Unaudited: keep mainnet amounts small.
 
 ## Credits
 

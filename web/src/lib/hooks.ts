@@ -28,188 +28,127 @@ function useBackingRead<T extends string>(functionName: T, args?: readonly unkno
 
 // ---------------------------------------------------------------- types
 
-export type CreatorView = {
-  creator: `0x${string}`;
-  name: string;
-  bio: string;
-  avatar: string;
-  banner: string;
-  handle: string;
-  fid: bigint;
-  x: string;
-  xPost: string;
-  registeredAt: bigint;
-  lastClaimAt: bigint;
+export type Profile = { username: string; baseName: string; avatar: string; bio: string; link: string };
+
+export type ProfileView = {
+  account: `0x${string}`;
+  profile: Profile;
+  joinedAt: bigint;
   nextClaimAt: bigint;
   principal: bigint;
   backerCount: bigint;
+  backingCount: bigint;
   claimable: bigint;
   totalClaimed: bigint;
   totalEarned: bigint;
   postCount: bigint;
-  castCount: bigint;
+  referred: bigint;
 };
 
 export enum Kind {
   Joined = 0,
   Backed = 1,
-  Claimed = 2,
-  Posted = 3,
-  Milestone = 4,
-  Commented = 5,
-  Ended = 6,
+  Unbacked = 2,
+  Claimed = 3,
+  Posted = 4,
+  Milestone = 5,
 }
 
 export type Activity = {
   id: bigint;
   kind: Kind;
   actor: `0x${string}`;
-  creator: `0x${string}`;
+  subject: `0x${string}`;
+  referrer: `0x${string}`;
   amount: bigint;
   time: number;
-  cast: `0x${string}`;
-  ref: bigint;
   text: string;
-  link: string;
   image: string;
 };
 
-export type PostStats = { backed: bigint; backings: number; comments: number };
-export type Post = Activity & { stats: PostStats };
-export type CastStat = { cast: `0x${string}`; backed: bigint; backings: bigint };
-export type BackerRow = { backer: `0x${string}`; principal: bigint; generated: bigint; endsAt: bigint; lockedUntil: bigint };
-
-export type PositionView = {
-  creator: `0x${string}`;
-  creatorName: string;
-  creatorAvatar: string;
-  principal: bigint;
-  yieldGenerated: bigint;
-  since: bigint;
-  endsAt: bigint;
-  lockedUntil: bigint;
-};
+export type PositionView = { backer: `0x${string}`; creator: `0x${string}`; principal: bigint; yieldGenerated: bigint; since: bigint };
 
 type RawActivity = Omit<Activity, "id" | "kind" | "time"> & { kind: number; time: number };
-type RawStats = { backed: bigint; backings: number; comments: number };
 
-function toActivities(ids: readonly bigint[], items: readonly RawActivity[]): Activity[] {
-  return items
-    .map((a, i) => ({ ...a, id: ids[i], kind: a.kind as Kind, time: Number(a.time) }))
-    .filter((a) => !isHidden(a.creator) && !isHidden(a.actor));
-}
-
-function toPosts(res: unknown): Post[] | undefined {
-  const d = res as readonly [readonly bigint[], readonly RawActivity[], readonly RawStats[]] | undefined;
+function toActivities(res: unknown): Activity[] | undefined {
+  const d = res as readonly [readonly bigint[], readonly RawActivity[]] | undefined;
   if (!d) return undefined;
-  const stats = new Map(d[0].map((id, i) => [id, d[2][i]]));
-  return toActivities(d[0], d[1]).map((a) => {
-    const s = stats.get(a.id)!;
-    return { ...a, stats: { backed: s.backed, backings: Number(s.backings), comments: Number(s.comments) } };
-  });
+  return d[1]
+    .map((a, i) => ({ ...a, id: d[0][i], kind: a.kind as Kind, time: Number(a.time) }))
+    .filter((a) => !isHidden(a.subject) && !isHidden(a.actor));
 }
 
-// ---------------------------------------------------------------- creators
+const byPrincipal = (a: PositionView, b: PositionView) => (b.principal > a.principal ? 1 : b.principal < a.principal ? -1 : 0);
 
-export function useCreators() {
-  const q = useBackingRead("getCreators", [0n, 500n]);
-  const data = useMemo(() => (q.data as CreatorView[] | undefined)?.filter((c) => !isHidden(c.creator)), [q.data]);
+// ---------------------------------------------------------------- people
+
+export function usePeople() {
+  const q = useBackingRead("getPeople", [0n, 1000n]);
+  const data = useMemo(() => (q.data as ProfileView[] | undefined)?.filter((p) => !isHidden(p.account)), [q.data]);
   return { ...q, data };
 }
 
-/** address (lowercase) -> creator, for naming people in posts and comments. */
-export function useCreatorMap() {
-  const { data } = useCreators();
-  return useMemo(() => new Map((data ?? []).map((c) => [c.creator.toLowerCase(), c])), [data]);
+/** address (lowercase) -> profile, for showing names and pictures anywhere. */
+export function usePeopleMap() {
+  const { data } = usePeople();
+  return useMemo(() => new Map((data ?? []).map((p) => [p.account.toLowerCase(), p])), [data]);
 }
 
-export function useCreator(addr?: `0x${string}`) {
-  const q = useBackingRead("getCreator", [addr ?? ZERO], !!addr);
-  const data = q.data as CreatorView | undefined;
-  const ok = !!data && data.registeredAt > 0n && !isHidden(data.creator);
+export function useProfile(addr?: `0x${string}`) {
+  const q = useBackingRead("getProfile", [addr ?? ZERO], !!addr);
+  const data = q.data as ProfileView | undefined;
+  const ok = !!data && data.joinedAt > 0n && !isHidden(data.account);
   return { ...q, data: ok ? data : undefined, missing: !!data && !ok };
 }
 
+export function useProfileByUsername(username?: string) {
+  const q = useBackingRead("getProfileByUsername", [username ?? ""], !!username);
+  const data = q.data as ProfileView | undefined;
+  const ok = !!data && data.joinedAt > 0n && !isHidden(data.account);
+  return { ...q, data: ok ? data : undefined, missing: !!data && !ok };
+}
+
+/** Everyone backing `addr`, biggest first. */
 export function useBackers(addr?: `0x${string}`) {
   const q = useBackingRead("getBackers", [addr ?? ZERO], !!addr);
-  const rows = useMemo(
-    () =>
-      [...((q.data as BackerRow[] | undefined) ?? [])].sort((a, b) => (b.principal > a.principal ? 1 : b.principal < a.principal ? -1 : 0)),
-    [q.data],
-  );
-  return { ...q, rows: q.data ? rows : undefined };
+  const rows = useMemo(() => (q.data ? [...(q.data as unknown as PositionView[])].sort(byPrincipal) : undefined), [q.data]);
+  return { ...q, rows };
 }
 
-export function useCasts(addr?: `0x${string}`) {
-  const q = useBackingRead("getCasts", [addr ?? ZERO], !!addr);
-  const data = useMemo(
-    () => [...((q.data as CastStat[] | undefined) ?? [])].sort((a, b) => (b.backed > a.backed ? 1 : b.backed < a.backed ? -1 : 0)),
-    [q.data],
-  );
-  return { ...q, data };
+/** Everyone `addr` is backing, biggest first. */
+export function useBacking(addr?: `0x${string}`) {
+  const q = useBackingRead("getBacking", [addr ?? ZERO], !!addr);
+  const rows = useMemo(() => (q.data ? [...(q.data as unknown as PositionView[])].sort(byPrincipal) : undefined), [q.data]);
+  return { ...q, rows };
 }
-
-// ---------------------------------------------------------------- posts and comments
-
-export function usePosts(limit: number) {
-  const q = useBackingRead("getPosts", [0n, BigInt(limit)]);
-  const data = useMemo(() => toPosts(q.data), [q.data]);
-  return { ...q, data };
-}
-
-export function useCreatorPosts(addr: `0x${string}` | undefined, limit: number) {
-  const q = useBackingRead("getCreatorPosts", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
-  const data = useMemo(() => toPosts(q.data), [q.data]);
-  return { ...q, data };
-}
-
-export function usePost(id?: bigint) {
-  const q = useBackingRead("getPost", [id ?? 0n], id !== undefined && id > 0n);
-  const data = useMemo(() => {
-    const d = q.data as readonly [RawActivity, RawStats] | undefined;
-    if (!d || id === undefined) return undefined;
-    const [a] = toActivities([id], [d[0]]);
-    if (!a) return undefined;
-    return { ...a, stats: { backed: d[1].backed, backings: Number(d[1].backings), comments: Number(d[1].comments) } } as Post;
-  }, [q.data, id]);
-  return { ...q, data };
-}
-
-export function useComments(postId?: bigint) {
-  const q = useBackingRead("getComments", [postId ?? 0n, 0n, 200n], postId !== undefined && postId > 0n);
-  const data = useMemo(() => {
-    const d = q.data as readonly [readonly bigint[], readonly RawActivity[]] | undefined;
-    return d ? toActivities(d[0], d[1]) : undefined;
-  }, [q.data]);
-  return { ...q, data };
-}
-
-/** Everything that happened to a creator, newest first: their notifications. */
-export function useCreatorActivity(addr: `0x${string}` | undefined, limit: number) {
-  const q = useBackingRead("getCreatorActivity", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
-  const data = useMemo(() => {
-    const d = q.data as readonly [readonly bigint[], readonly RawActivity[]] | undefined;
-    return d ? toActivities(d[0], d[1]) : undefined;
-  }, [q.data]);
-  return { ...q, data };
-}
-
-// ---------------------------------------------------------------- positions
 
 export function usePosition(backer?: `0x${string}`, creator?: `0x${string}`) {
   const q = useBackingRead("getPosition", [backer ?? ZERO, creator ?? ZERO], !!backer && !!creator);
   return { ...q, data: q.data as PositionView | undefined };
 }
 
-export function usePositions(backer?: `0x${string}`) {
-  const q = useBackingRead("getPositions", [backer ?? ZERO], !!backer);
-  return { ...q, data: q.data as PositionView[] | undefined };
+// ---------------------------------------------------------------- posts and inbox
+
+export function usePosts(limit: number) {
+  const q = useBackingRead("getPosts", [0n, BigInt(limit)]);
+  return { ...q, data: useMemo(() => toActivities(q.data), [q.data]) };
+}
+
+export function usePostsBy(addr: `0x${string}` | undefined, limit: number) {
+  const q = useBackingRead("getPostsBy", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
+  return { ...q, data: useMemo(() => toActivities(q.data), [q.data]) };
+}
+
+/** Everything that concerns `addr`, newest first: their notifications. */
+export function useInbox(addr: `0x${string}` | undefined, limit: number) {
+  const q = useBackingRead("getInbox", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
+  return { ...q, data: useMemo(() => toActivities(q.data), [q.data]) };
 }
 
 export function useStats() {
   const q = useBackingRead("stats");
   const d = q.data as readonly [bigint, bigint, bigint, bigint] | undefined;
-  return { ...q, stats: d && { principal: d[0], creators: d[1], distributed: d[2], claimed: d[3] } };
+  return { ...q, stats: d && { principal: d[0], people: d[1], distributed: d[2], claimed: d[3] } };
 }
 
 /**

@@ -2,25 +2,18 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { useAccount } from "wagmi";
-import { MessageCircle, Undo2 } from "lucide-react";
-import { Kind, useCreator, useCreatorMap, type Activity, type CreatorView } from "@/lib/hooks";
+import { Kind, usePeopleMap, type Activity, type ProfileView } from "@/lib/hooks";
 import { useNotifications } from "@/lib/notifications";
 import { ago, money, num, short } from "@/lib/format";
-import { useUi } from "@/lib/ui-state";
 import { Avatar } from "@/components/Avatar";
-import { PageHeader } from "@/components/Shell";
 import { SignIn } from "@/components/SignIn";
-import { WindowMark } from "@/components/WindowMark";
 import { Skeleton } from "@/components/ui";
 
 export default function Notifications() {
   const { address, isConnected } = useAccount();
-  const { data: me } = useCreator(address);
-  const { items, ended, seen, markSeen, isLoading } = useNotifications();
-  const creators = useCreatorMap();
-  const ui = useUi();
+  const { items, seen, markSeen, isLoading } = useNotifications();
+  const people = usePeopleMap();
 
-  // mark as read a moment after opening, so new items still flash as new this time
   useEffect(() => {
     if (!items.length) return;
     const t = setTimeout(markSeen, 1500);
@@ -30,105 +23,56 @@ export default function Notifications() {
 
   if (!isConnected)
     return (
-      <>
-        <PageHeader title="Notifications" />
-        <div className="flex flex-col items-center gap-4 px-8 py-16 text-center">
-          <div className="text-[20px] font-medium">Sign in to see who backed you</div>
-          <SignIn big />
-        </div>
-      </>
+      <div className="surface flex flex-col items-center gap-4 px-6 py-14 text-center">
+        <div className="text-[20px] font-medium">Connect to see your notifications</div>
+        <SignIn big />
+      </div>
     );
 
   return (
-    <>
-      <PageHeader title="Notifications" />
-      {ended.map((p) => (
-        <div key={p.creator} className="flex gap-3 border-b border-[var(--line)] bg-raised/30 px-4 py-4">
-          <Undo2 size={22} strokeWidth={1.5} className="mt-1 shrink-0 text-lamp" />
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px]">
-              Your backing of <span className="font-medium">{p.creatorName}</span> has ended. Your <span className="num">{money(num(p.principal))}</span> is ready to come back
-            </p>
-            <button className="btn btn-primary btn-sm mt-2" onClick={() => ui.openBack({ creator: p.creator })}>
-              Close and withdraw
-            </button>
-          </div>
-        </div>
-      ))}
+    <div className="flex flex-col gap-4">
+      <h1 className="text-[22px] font-medium">Notifications</h1>
       {isLoading ? (
-        <div className="p-4">
-          <Skeleton className="h-40" />
-        </div>
-      ) : items.length === 0 && ended.length === 0 ? (
-        <div className="px-8 py-16 text-center">
-          <div className="text-[20px] font-medium">Nothing to see yet</div>
-          <p className="mx-auto mt-2 max-w-sm text-fg-2">
-            {me ? "When someone backs you, comments on your posts or you hit a milestone, it shows here" : (
-              <>
-                Notifications are mostly for creators.{" "}
-                <Link className="text-lamp hover:underline" href="/creator">
-                  Start as a creator
-                </Link>
-              </>
-            )}
-          </p>
-        </div>
+        <Skeleton className="h-48" />
+      ) : items.length === 0 ? (
+        <div className="surface px-6 py-12 text-center text-fg-2">When someone backs you, or backs someone through your invite link, it shows up here</div>
       ) : (
-        items.map((a) => <Item key={a.id.toString()} a={a} creators={creators} fresh={a.id > seen} />)
+        <ul className="surface divide-line overflow-hidden">
+          {items.map((a) => (
+            <Item key={a.id.toString()} a={a} me={address!} people={people} fresh={a.id > seen} />
+          ))}
+        </ul>
       )}
-    </>
+    </div>
   );
 }
 
-function Item({ a, creators, fresh }: { a: Activity; creators: Map<string, CreatorView>; fresh: boolean }) {
-  const who = creators.get(a.actor.toLowerCase());
-  const name = <span className="font-medium">{who?.name ?? short(a.actor)}</span>;
-  let icon = <WindowMark size={22} />;
-  let body: React.ReactNode = null;
-  let href: string | undefined;
-  if (a.kind === Kind.Backed) {
-    body = (
+function Item({ a, me, people, fresh }: { a: Activity; me: string; people: Map<string, ProfileView>; fresh: boolean }) {
+  const who = people.get(a.actor.toLowerCase());
+  const subject = people.get(a.subject.toLowerCase());
+  const name = who ? `@${who.profile.username}` : short(a.actor);
+  const amt = <span className="num">{money(num(a.amount))}</span>;
+  const viaMyLink = a.kind === Kind.Backed && a.referrer.toLowerCase() === me.toLowerCase() && a.subject.toLowerCase() !== me.toLowerCase();
+  let text: React.ReactNode;
+  if (a.kind === Kind.Milestone) text = <>You passed {amt} in backing</>;
+  else if (viaMyLink)
+    text = (
       <>
-        {name} backed you with <span className="num">{money(num(a.amount))}</span>
-        {a.ref > 0n && " from your post"}
+        Your invite brought {name}. They backed {subject ? `@${subject.profile.username}` : short(a.subject)} with {amt}
       </>
     );
-    href = a.ref > 0n ? `/p/${a.ref}` : undefined;
-  } else if (a.kind === Kind.Commented) {
-    icon = <MessageCircle size={22} strokeWidth={1.5} className="text-fg-2" />;
-    body = <>{name} commented on your post</>;
-    href = `/p/${a.ref}`;
-  } else if (a.kind === Kind.Milestone) {
-    body = (
-      <>
-        You passed <span className="num">{money(num(a.amount))}</span> in backing
-      </>
-    );
-  } else if (a.kind === Kind.Ended) {
-    icon = <Undo2 size={22} strokeWidth={1.5} className="text-fg-2" />;
-    body = (
-      <>
-        {name}&apos;s backing of <span className="num">{money(num(a.amount))}</span> ended
-      </>
-    );
-  } else if (a.kind === Kind.Claimed) {
-    body = (
-      <>
-        You claimed <span className="num">{money(num(a.amount))}</span>
-      </>
-    );
-  }
-  const content = (
-    <div className={`flex gap-3 border-b border-[var(--line)] px-4 py-3 transition-colors hover:bg-raised/30 ${fresh ? "bg-raised/30" : ""}`}>
-      <div className="w-8 shrink-0 pt-1">{icon}</div>
-      <div className="min-w-0 flex-1">
-        <Avatar address={a.actor} src={who?.avatar} name={who?.name} size={32} />
-        <p className="mt-2 text-[15px]">
-          {body} <span className="text-muted">· {ago(a.time)}</span>
+  else if (a.kind === Kind.Backed) text = <>{name} backed you with {amt}</>;
+  else text = <>{name} stopped backing you and took back {amt}</>;
+  const href = who ? `/u/${who.profile.username}` : `/u/${a.actor}`;
+  return (
+    <li>
+      <Link href={a.kind === Kind.Milestone ? "/portfolio" : href} className={`flex items-center gap-3 px-4 py-3 transition-colors hover:bg-raised/60 ${fresh ? "bg-raised/40" : ""}`}>
+        <Avatar address={a.actor} src={who?.profile.avatar} name={who?.profile.username} size={36} />
+        <p className="min-w-0 flex-1 text-[15px]">
+          {text} <span className="text-muted">· {ago(a.time)}</span>
         </p>
-        {a.text && <p className="mt-1 text-[15px] text-fg-2">{a.text}</p>}
-      </div>
-    </div>
+        {fresh && <span className="h-2 w-2 shrink-0 rounded-full bg-lamp" aria-label="New" />}
+      </Link>
+    </li>
   );
-  return href ? <Link href={href}>{content}</Link> : content;
 }

@@ -44,13 +44,6 @@ export function countdown(seconds: number): string {
   return `${s}s`;
 }
 
-/** Pulls a 20-byte Farcaster cast hash out of a hash or a cast URL. */
-export function parseCastHash(v?: string | null): `0x${string}` | null {
-  const m = v?.match(/0x[0-9a-fA-F]{40}(?![0-9a-fA-F])/);
-  return m ? (m[0].toLowerCase() as `0x${string}`) : null;
-}
-
-export const ZERO_CAST = "0x0000000000000000000000000000000000000000" as const;
 
 export function errMsg(e: unknown): string {
   const err = e as { shortMessage?: string; message?: string };
@@ -59,45 +52,34 @@ export function errMsg(e: unknown): string {
   if (/insufficient funds/i.test(m)) return "Not enough ETH for gas on this network";
   const map: Record<string, string> = {
     CannotBackSelf: "You can't back yourself",
+    NoProfile: "Create your profile first",
+    UsernameTaken: "That username is taken",
     AmountTooSmall: "The minimum is 1 USDC",
     InsufficientPrincipal: "That's more than you have staked",
     EpochNotOver: "This epoch isn't over yet",
     NothingToClaim: "Nothing to claim yet",
-    AlreadyRegistered: "This wallet already has a creator profile",
-    InvalidProfile: "Check your profile. A name is required and the bio fits in 280 characters",
-    InvalidPost: "Posts need text, a picture or a link. Text fits in 280 characters",
-    InvalidComment: "Comments fit in 280 characters",
-    UnknownPost: "That post doesn't exist",
-    InvalidDuration: "Pick a length to lock for",
-    Locked: "This backing is locked until its end date",
-    NotEnded: "This backing hasn't ended yet",
+    InvalidProfile: "Usernames are 3 to 20 characters: lowercase letters, numbers and _",
+    InvalidPost: "Posts need text or a picture. Text fits in 280 characters",
     DepositLoss: "The vault's share price looks off right now, so we stopped the deposit to protect you. Try again later",
-    NoteTooLong: "Notes fit in 140 characters",
     FaucetCooldown: "The faucet works once an hour",
-    NotRegistered: "That address isn't a creator",
   };
   for (const k of Object.keys(map)) if (m.includes(k)) return map[k];
   return m.split("\n")[0];
 }
 
-export const DURATIONS = [
-  { label: "1 hour", secs: 3600 },
-  { label: "1 day", secs: 86_400 },
-  { label: "1 week", secs: 604_800 },
-  { label: "1 month", secs: 2_592_000 },
-  { label: "Ongoing", secs: 0 },
-] as const;
-
-/** Human summary of a position's terms. */
-export function terms(endsAt: bigint | number, lockedUntil: bigint | number, now = Math.floor(Date.now() / 1000)) {
-  const end = Number(endsAt);
-  const lock = Number(lockedUntil);
-  if (!end) return lock > now ? { label: `Locked for ${countdown(lock - now)}`, ended: false, locked: true } : { label: "Ongoing", ended: false, locked: false };
-  if (now >= end) return { label: "Ended", ended: true, locked: false };
-  if (lock > now) return { label: `Locked, ends in ${countdown(end - now)}`, ended: false, locked: true };
-  return { label: `Ends in ${countdown(end - now)}`, ended: false, locked: false };
-}
-
 export function dateLabel(ts: number | bigint) {
   return new Date(Number(ts) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
+
+/** Loyalty badges: how much you back, and for how long. */
+export function badges(principal: number, since: bigint | number, now = Math.floor(Date.now() / 1000)) {
+  const out: string[] = [];
+  out.push(principal >= 1000 ? "Night owl" : principal >= 100 ? "Lamplighter" : "Firefly");
+  const nights = Number(since) ? Math.floor((now - Number(since)) / 86400) : 0;
+  if (nights >= 100) out.push("100 nights");
+  else if (nights >= 30) out.push("30 nights");
+  else if (nights >= 7) out.push("First week");
+  return out;
+}
+
+export const isUsername = (s: string) => /^[a-z0-9_]{3,20}$/.test(s);

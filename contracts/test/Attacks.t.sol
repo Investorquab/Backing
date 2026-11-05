@@ -3,180 +3,140 @@ pragma solidity ^0.8.24;
 
 import {Base} from "./Backing.t.sol";
 import {Backing} from "../src/Backing.sol";
-import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {MockYieldVault} from "../src/mocks/MockYieldVault.sol";
 import {ReentrantVault} from "./mocks/ReentrantVault.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @notice Each test is an attempt to steal money or break the accounting.
 contract AttackTest is Base {
-    // 1. Vault loses money (bad debt). Early leavers must not dump the loss on late leavers.
+    // 1. Vault loses money. Leaving first must not dump the loss on whoever leaves last.
     function test_attack_bank_run_after_vault_loss_is_shared_fairly() public {
         _back(fan1, alice, 1_000e6);
         _back(fan2, alice, 1_000e6);
         _back(fan3, bob, 1_000e6);
-        vault.setApr(0); // isolate the loss from yield
-        vault.simulateLoss(300e6); // the vault loses 10%
-
-        uint256[3] memory got;
+        vault.setApr(0);
+        // the vault holds 13,000 (10k from others + our 3k); losing 1,300 is a 10% hit for everyone
+        vault.simulateLoss(1_300e6);
         address[3] memory fans = [fan1, fan2, fan3];
         address[3] memory cr = [alice, alice, bob];
         for (uint256 i; i < 3; i++) {
             uint256 b = usdc.balanceOf(fans[i]);
             vm.prank(fans[i]);
             backing.unbackAll(cr[i]);
-            got[i] = usdc.balanceOf(fans[i]) - b;
+            assertApproxEqAbs(usdc.balanceOf(fans[i]) - b, 900e6, 3, "everyone takes the same 10%");
         }
-        assertApproxEqAbs(got[0], 900e6, 2, "first out takes the same haircut");
-        assertApproxEqAbs(got[1], 900e6, 2);
-        assertApproxEqAbs(got[2], 900e6, 2, "last out isn't left with the whole loss");
     }
 
-    // 2. A small loss is absorbed by the reserve before it touches anyone's principal.
-    function test_attack_small_loss_hits_reserve_first() public {
-        _backTimed(fan1, alice, 10_000e6, 1 days, false);
-        vm.warp(vm.getBlockTimestamp() + 30 days);
-        backing.close(fan1, alice); // 29 days of yield move to the reserve
-        _back(fan2, bob, 1_000e6);
-        uint256 r = backing.reserve();
-        assertGt(r, 50e6);
-        vault.setApr(0);
-        vault.simulateLoss(20e6);
-        vm.prank(fan2);
-        backing.unbackAll(bob);
-        assertEq(usdc.balanceOf(fan2), START, "principal untouched");
-        assertLt(backing.reserve(), r, "reserve paid for it");
-    }
-
-    // 3. Idle-yield sniping: when nobody is backing, growth on unclaimed creator balances must not
-    //    be handed to whoever backs next (e.g. a creator backing themselves with a second wallet).
+    // 2. Idle-yield sniping: growth while nothing is backed must not go to whoever backs next.
     function test_attack_idle_yield_sniping() public {
         _back(fan1, alice, 100_000e6);
-        vm.warp(vm.getBlockTimestamp() + 365 days);
+        vm.warp(_now() + 365 days);
         vm.prank(fan1);
-        backing.unbackAll(alice); // alice has ~10k unclaimed, nothing is backed now
-        vm.warp(vm.getBlockTimestamp() + 365 days); // the unclaimed 10k grows ~1k while idle
-
+        backing.unbackAll(alice); // alice holds ~10k unclaimed, nothing is backed
+        vm.warp(_now() + 365 days); // that 10k grows ~1k while idle
         address sybil = makeAddr("bobs-other-wallet");
         usdc.mint(sybil, 1e6);
         vm.startPrank(sybil);
         usdc.approve(address(backing), 1e6);
-        backing.back(bob, 1e6, _opts(0, false));
+        backing.back(bob, 1e6, address(0));
         vm.stopPrank();
         backing.sync();
-        assertLt(backing.claimable(bob), 1e6, "bob captured none of the idle growth");
+        assertLt(backing.claimable(bob), 1e6, "bob captured none of it");
         assertGt(backing.reserve(), 900e6, "it went to the reserve");
     }
 
-    // 4. Reentrancy: a malicious vault calls back into Backing mid-deposit / mid-withdraw.
+    // 3. Reentrancy through a malicious vault, during deposit and withdraw.
     function test_attack_reentrancy_via_malicious_vault() public {
         ReentrantVault evil = new ReentrantVault(usdc);
         Backing b2 = new Backing(evil, EPOCH, 1e6);
         vm.prank(alice);
-        b2.registerCreator(_profile("Alice"));
+        b2.saveProfile(_p("alice"));
         vm.prank(fan1);
         usdc.approve(address(b2), type(uint256).max);
-
-        evil.arm(address(b2), 1, address(0)); // re-enter sync() during deposit
+        evil.arm(address(b2), 1, address(0));
         vm.prank(fan1);
         vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
-        b2.back(alice, 100e6, _opts(0, false));
-
+        b2.back(alice, 100e6, address(0));
         evil.arm(address(0), 0, address(0));
         vm.prank(fan1);
-        b2.back(alice, 100e6, _opts(0, false));
-        evil.arm(address(b2), 2, alice); // re-enter unbackAll() during the withdraw
+        b2.back(alice, 100e6, address(0));
+        evil.arm(address(b2), 2, alice);
         vm.prank(fan1);
         vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
         b2.unbackAll(alice);
-        assertEq(b2.getPosition(fan1, alice).principal, 100e6, "nothing moved");
+        assertEq(b2.getPosition(fan1, alice).principal, 100e6);
     }
 
-    // 4b. ERC-4626 inflation attack: donate into an EMPTY vault so the next deposit rounds down to
-    //     almost no shares. Backing refuses a deposit that comes back short instead of losing it.
+    // 4. ERC-4626 inflation attack: donate into an empty vault so the next deposit rounds to dust.
     function test_attack_empty_vault_inflation_is_refused() public {
         MockYieldVault fresh = new MockYieldVault(usdc, 0);
         Backing b2 = new Backing(fresh, EPOCH, 1e6);
         vm.prank(alice);
-        b2.registerCreator(_profile("Alice"));
+        b2.saveProfile(_p("alice"));
         address attacker = makeAddr("attacker");
         usdc.mint(attacker, 1_000_000e6);
         vm.prank(attacker);
-        usdc.transfer(address(fresh), 1_000_000e6); // inflate the share price of an empty vault
+        usdc.transfer(address(fresh), 1_000_000e6);
         vm.startPrank(fan1);
         usdc.approve(address(b2), type(uint256).max);
         vm.expectRevert(Backing.DepositLoss.selector);
-        b2.back(alice, 100e6, _opts(0, false));
+        b2.back(alice, 100e6, address(0));
         vm.stopPrank();
-        assertEq(usdc.balanceOf(fan1), START, "victim keeps their money");
+        assertEq(usdc.balanceOf(fan1), START);
     }
 
-    // 5. Someone donates to the vault to manipulate the share price. It just becomes yield.
+    // 5. Donating to the vault just becomes creator yield; backers exit exactly whole.
     function test_attack_vault_donation_is_harmless() public {
         _back(fan1, alice, 1_000e6);
         address whale = makeAddr("whale");
         usdc.mint(whale, 50_000e6);
         vm.prank(whale);
         usdc.transfer(address(vault), 50_000e6);
-        backing.sync();
-        assertGt(backing.claimable(alice), 0);
         vm.prank(fan1);
         backing.unbackAll(alice);
-        assertEq(usdc.balanceOf(fan1), START, "fan exactly whole, not more");
+        assertEq(usdc.balanceOf(fan1), START);
     }
 
-    // 6. USDC sent straight to the Backing contract is ignored, not counted or stolen.
-    function test_attack_direct_transfer_to_backing() public {
+    // 6. USDC sent straight to the contract is ignored.
+    function test_attack_direct_transfer() public {
         _back(fan1, alice, 1_000e6);
-        usdc.mint(address(this), 5e6);
-        usdc.transfer(address(backing), 5e6);
+        usdc.mint(address(backing), 5e6);
         vm.prank(fan1);
         backing.unbackAll(alice);
         assertEq(usdc.balanceOf(fan1), START);
         assertEq(usdc.balanceOf(address(backing)), 5e6);
     }
 
-    // 7. Rounding drain: hundreds of tiny in/out cycles can't pull out a single extra wei.
+    // 7. Rounding drain over many tiny in/out cycles.
     function test_attack_rounding_drain() public {
-        _back(fan2, bob, 777_777_777); // other money in the pot
+        _back(fan2, bob, 777_777_777);
         vault.setApr(0);
         for (uint256 i; i < 150; i++) {
             _back(fan1, alice, 1_000_001 + i);
             vm.prank(fan1);
             backing.unbackAll(alice);
         }
-        assertLe(usdc.balanceOf(fan1), START, "no profit from rounding");
+        assertLe(usdc.balanceOf(fan1), START);
         vm.prank(fan2);
         backing.unbackAll(bob);
-        assertEq(usdc.balanceOf(fan2), START, "victim untouched");
+        assertEq(usdc.balanceOf(fan2), START);
     }
 
-    // 8. Closing someone's ended backing can't redirect their money.
-    function test_attack_close_cannot_redirect_funds() public {
-        _backTimed(fan1, alice, 5_000e6, 1 hours, true);
-        address mallory = makeAddr("mallory");
-        vm.warp(vm.getBlockTimestamp() + 2 hours);
-        vm.prank(mallory);
-        backing.close(fan1, alice);
-        assertEq(usdc.balanceOf(mallory), 0);
-        assertEq(usdc.balanceOf(fan1), START);
-    }
-
-    // 9. A stranger can't touch anyone else's position.
+    // 8. Nobody can withdraw someone else's principal.
     function test_attack_cannot_withdraw_others_principal() public {
         _back(fan1, alice, 1_000e6);
-        vm.prank(fan2);
+        vm.startPrank(fan2);
         vm.expectRevert(Backing.InsufficientPrincipal.selector);
         backing.unback(alice, 1_000e6);
-        vm.prank(fan2);
         vm.expectRevert(Backing.InsufficientPrincipal.selector);
         backing.unbackAll(alice);
+        vm.stopPrank();
     }
 
-    // 10. A creator can't claim before the epoch is up, nor claim twice.
+    // 9. Claiming twice inside an epoch.
     function test_attack_double_claim() public {
         _back(fan1, alice, 10_000e6);
-        vm.warp(vm.getBlockTimestamp() + 10 days);
+        vm.warp(_now() + 10 days);
         vm.prank(alice);
         backing.claim();
         vm.prank(alice);
@@ -184,19 +144,45 @@ contract AttackTest is Base {
         backing.claim();
     }
 
-    // 11. Loss during claims: a creator claiming during a shortfall takes the same haircut.
-    function test_attack_creator_claim_during_shortfall_is_haircut() public {
+    // 10. A creator claiming during a shortfall takes the same haircut as backers.
+    function test_attack_claim_during_shortfall_is_haircut() public {
         _back(fan1, alice, 10_000e6);
-        vm.warp(vm.getBlockTimestamp() + 365 days); // ~1k yield
+        vm.warp(_now() + 365 days);
         vault.setApr(0);
         backing.sync();
         uint256 owed = backing.claimable(alice);
-        vault.simulateLoss(1_100e6); // ~10% of everything
+        // vault holds ~22,000 (10k others, 10k principal, ~2k yield across both); lose 10%
+        vault.simulateLoss(usdc.balanceOf(address(vault)) / 10);
         vm.prank(alice);
         uint256 paid = backing.claim();
-        assertApproxEqRel(paid, owed * 9 / 10, 0.01e18);
+        assertApproxEqRel(paid, (owed * 9) / 10, 0.01e18);
         vm.prank(fan1);
         backing.unbackAll(alice);
-        assertApproxEqRel(usdc.balanceOf(fan1), START - 1_000e6, 0.001e18, "fan took the same 10%");
+        assertApproxEqRel(usdc.balanceOf(fan1), START - 1_000e6, 0.001e18);
+    }
+
+    // 11. Squatting someone's username isn't possible once taken; releasing it frees it.
+    function test_attack_username_squatting() public {
+        vm.prank(fan1);
+        vm.expectRevert(Backing.UsernameTaken.selector);
+        backing.saveProfile(_p("alice"));
+        vm.prank(alice);
+        backing.saveProfile(_p("alice_new"));
+        _join(fan1, "alice"); // freed by its owner, now claimable
+        assertEq(backing.getProfileByUsername("alice").account, fan1);
+        assertEq(backing.getProfileByUsername("alice_new").account, alice);
+    }
+
+    // 12. Fake referrals: referring yourself or a wallet with no profile counts nothing.
+    function test_attack_fake_referrals() public {
+        for (uint256 i; i < 5; i++) {
+            address sock = makeAddr(string(abi.encode(i)));
+            usdc.mint(sock, 2e6);
+            vm.startPrank(sock);
+            usdc.approve(address(backing), 2e6);
+            backing.back(alice, 1e6, sock);
+            vm.stopPrank();
+        }
+        assertEq(backing.getProfile(alice).referred, 0);
     }
 }

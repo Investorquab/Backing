@@ -23,7 +23,7 @@ export function NetBanner() {
     query: { enabled: !!d && !!address, refetchInterval: 8000 },
   });
 
-  const wrap = (children: React.ReactNode) => <div className="border-b border-[var(--line)] px-4 py-3">{children}</div>;
+  const wrap = (children: React.ReactNode) => <div className="surface px-4 py-3">{children}</div>;
 
   if (!d) return wrap(<div className="text-[14px] text-fg-2">Backing isn&apos;t deployed on {net.chain.name} yet. The README explains how to deploy it</div>);
 
@@ -31,7 +31,7 @@ export function NetBanner() {
   if (hostLacksChain)
     return wrap(
       <div className="text-[14px] text-fg-2">
-        This app&apos;s wallet doesn&apos;t support {net.chain.name}. Pick another network at the top, or open Backing in a browser to try the free demo
+        This app&apos;s wallet doesn&apos;t support {net.chain.name}. Pick another network in your account menu, or open Backing in a browser to try the free demo
       </div>,
     );
 

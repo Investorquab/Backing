@@ -9,7 +9,7 @@ export const revalidate = 300;
 
 const fmt = (v: bigint) => "$" + Number(formatUnits(v, 6)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-type Creator = { name: string; handle: string; principal: bigint; backerCount: bigint; totalEarned: bigint; registeredAt: bigint };
+type Creator = { name: string; principal: bigint; backerCount: bigint; totalEarned: bigint; joined: bigint };
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -20,10 +20,17 @@ export async function GET(req: Request) {
   if (isAddress(addr) && net.deployment) {
     try {
       const client = clientFor(net.key);
-      c = (await client.readContract({ address: net.deployment.backing, abi: backingAbi, functionName: "getCreator", args: [addr] })) as unknown as Creator;
+      const p = (await client.readContract({ address: net.deployment.backing, abi: backingAbi, functionName: "getProfile", args: [addr] })) as unknown as {
+        profile: { username: string };
+        principal: bigint;
+        backerCount: bigint;
+        totalEarned: bigint;
+        joinedAt: bigint;
+      };
+      c = { name: `@${p.profile.username}`, principal: p.principal, backerCount: p.backerCount, totalEarned: p.totalEarned, joined: p.joinedAt };
       const b = (await client.readContract({ address: net.deployment.backing, abi: backingAbi, functionName: "getBackers", args: [addr] })) as unknown as { principal: bigint }[];
       backers = b.map((r) => r.principal).sort((x, y) => (y > x ? 1 : -1));
-      if (!c || c.registeredAt === 0n) c = null;
+      if (!c || c.joined === 0n) c = null;
     } catch {
       c = null;
     }

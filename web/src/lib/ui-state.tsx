@@ -2,7 +2,7 @@
 import { createContext, useCallback, useContext, useState } from "react";
 
 /** App-wide UI: the composer and the back dialog can be opened from anywhere. */
-type BackTarget = { creator: `0x${string}`; post?: bigint } | null;
+type BackTarget = { creator: `0x${string}` } | null;
 type Ctx = {
   composeOpen: boolean;
   openCompose: () => void;
