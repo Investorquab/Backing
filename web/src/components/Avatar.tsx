@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 import { useState } from "react";
+import { safeImage } from "@/lib/images";
 
 function hue(address: string, salt: number) {
   let h = salt;
@@ -11,10 +12,11 @@ function hue(address: string, salt: number) {
 export function Avatar({ address, src, name, size = 40 }: { address: string; src?: string; name?: string; size?: number }) {
   const [broken, setBroken] = useState(false);
   const style = { width: size, height: size };
-  if (src && !broken && /^https:\/\//.test(src)) {
+  const ok = safeImage(src) ?? (src && /^https:\/\//.test(src) ? src : null);
+  if (ok && !broken) {
     return (
       <img
-        src={src}
+        src={ok}
         alt={name ?? ""}
         style={style}
         className="shrink-0 rounded-full border border-[var(--line)] bg-raised object-cover"

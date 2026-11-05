@@ -3,6 +3,8 @@ import { useState } from "react";
 import { Link2, Share } from "lucide-react";
 import { useNet } from "@/lib/net";
 import { useMiniApp } from "@/lib/miniapp";
+import { xIntent } from "@/lib/x";
+import { XGlyph } from "./XBits";
 
 export function profileUrl(address: string, netKey: string) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -40,9 +42,14 @@ export function ShareRow({ address, name, mine = false, text }: { address: strin
           <Share size={16} strokeWidth={1.5} /> {mine ? "Cast my profile" : "Cast this"}
         </button>
       ) : (
-        <button className="btn btn-secondary btn-sm" onClick={share}>
-          <Share size={16} strokeWidth={1.5} /> Share
-        </button>
+        <>
+          <a className="btn btn-secondary btn-sm" href={xIntent(message, url)} target="_blank" rel="noreferrer">
+            <XGlyph size={13} /> Post on X
+          </a>
+          <button className="btn btn-quiet btn-sm" onClick={share}>
+            <Share size={16} strokeWidth={1.5} /> Share
+          </button>
+        </>
       )}
       <button className="btn btn-quiet btn-sm" onClick={copy}>
         <Link2 size={16} strokeWidth={1.5} /> {copied ? "Copied" : "Copy link"}

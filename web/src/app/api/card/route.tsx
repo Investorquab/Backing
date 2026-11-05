@@ -1,16 +1,11 @@
 import { ImageResponse } from "next/og";
-import { createPublicClient, http, isAddress, formatUnits } from "viem";
+import { isAddress, formatUnits } from "viem";
+import { clientFor } from "@/lib/server";
 import { backingAbi } from "@/lib/abi";
 import { NETWORKS, netFromParam } from "@/lib/networks";
 
 /** 3:2 share card for a creator: the image Base App shows on a cast, and the OG image elsewhere. */
 export const revalidate = 300;
-
-const RPC: Record<string, string | undefined> = {
-  sepolia: process.env.NEXT_PUBLIC_BASE_SEPOLIA_RPC,
-  base: process.env.NEXT_PUBLIC_BASE_RPC,
-  local: "http://127.0.0.1:8545",
-};
 
 const fmt = (v: bigint) => "$" + Number(formatUnits(v, 6)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -24,10 +19,10 @@ export async function GET(req: Request) {
   let backers: bigint[] = [];
   if (isAddress(addr) && net.deployment) {
     try {
-      const client = createPublicClient({ chain: net.chain, transport: http(RPC[net.key]) });
+      const client = clientFor(net.key);
       c = (await client.readContract({ address: net.deployment.backing, abi: backingAbi, functionName: "getCreator", args: [addr] })) as unknown as Creator;
-      const b = (await client.readContract({ address: net.deployment.backing, abi: backingAbi, functionName: "getBackers", args: [addr] })) as unknown as [string[], bigint[], bigint[]];
-      backers = [...b[1]].sort((x, y) => (y > x ? 1 : -1));
+      const b = (await client.readContract({ address: net.deployment.backing, abi: backingAbi, functionName: "getBackers", args: [addr] })) as unknown as { principal: bigint }[];
+      backers = b.map((r) => r.principal).sort((x, y) => (y > x ? 1 : -1));
       if (!c || c.registeredAt === 0n) c = null;
     } catch {
       c = null;

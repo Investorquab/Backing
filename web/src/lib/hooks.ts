@@ -4,13 +4,12 @@ import { useAccount, usePublicClient, useReadContract, useSwitchChain, useWriteC
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { backingAbi, demoVaultAbi } from "./abi";
 import { useNet } from "./net";
-import { FALLBACK_APY } from "./networks";
-import { errMsg } from "./format";
-import { isHidden } from "./networks";
+import { FALLBACK_APY, isHidden } from "./networks";
 import { useMiniApp } from "./miniapp";
+import { errMsg } from "./format";
 
 const POLL = 5_000;
-const ZERO = "0x0000000000000000000000000000000000000000" as const;
+export const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
 function useBackingRead<T extends string>(functionName: T, args?: readonly unknown[], enabled = true) {
   const { net } = useNet();
@@ -27,13 +26,18 @@ function useBackingRead<T extends string>(functionName: T, args?: readonly unkno
   });
 }
 
+// ---------------------------------------------------------------- types
+
 export type CreatorView = {
   creator: `0x${string}`;
   name: string;
   bio: string;
   avatar: string;
+  banner: string;
   handle: string;
   fid: bigint;
+  x: string;
+  xPost: string;
   registeredAt: bigint;
   lastClaimAt: bigint;
   nextClaimAt: bigint;
@@ -52,6 +56,8 @@ export enum Kind {
   Claimed = 2,
   Posted = 3,
   Milestone = 4,
+  Commented = 5,
+  Ended = 6,
 }
 
 export type Activity = {
@@ -62,11 +68,16 @@ export type Activity = {
   amount: bigint;
   time: number;
   cast: `0x${string}`;
+  ref: bigint;
   text: string;
   link: string;
+  image: string;
 };
 
+export type PostStats = { backed: bigint; backings: number; comments: number };
+export type Post = Activity & { stats: PostStats };
 export type CastStat = { cast: `0x${string}`; backed: bigint; backings: bigint };
+export type BackerRow = { backer: `0x${string}`; principal: bigint; generated: bigint; endsAt: bigint; lockedUntil: bigint };
 
 export type PositionView = {
   creator: `0x${string}`;
@@ -75,7 +86,30 @@ export type PositionView = {
   principal: bigint;
   yieldGenerated: bigint;
   since: bigint;
+  endsAt: bigint;
+  lockedUntil: bigint;
 };
+
+type RawActivity = Omit<Activity, "id" | "kind" | "time"> & { kind: number; time: number };
+type RawStats = { backed: bigint; backings: number; comments: number };
+
+function toActivities(ids: readonly bigint[], items: readonly RawActivity[]): Activity[] {
+  return items
+    .map((a, i) => ({ ...a, id: ids[i], kind: a.kind as Kind, time: Number(a.time) }))
+    .filter((a) => !isHidden(a.creator) && !isHidden(a.actor));
+}
+
+function toPosts(res: unknown): Post[] | undefined {
+  const d = res as readonly [readonly bigint[], readonly RawActivity[], readonly RawStats[]] | undefined;
+  if (!d) return undefined;
+  const stats = new Map(d[0].map((id, i) => [id, d[2][i]]));
+  return toActivities(d[0], d[1]).map((a) => {
+    const s = stats.get(a.id)!;
+    return { ...a, stats: { backed: s.backed, backings: Number(s.backings), comments: Number(s.comments) } };
+  });
+}
+
+// ---------------------------------------------------------------- creators
 
 export function useCreators() {
   const q = useBackingRead("getCreators", [0n, 500n]);
@@ -83,41 +117,10 @@ export function useCreators() {
   return { ...q, data };
 }
 
-/** address (lowercase) -> creator, for naming actors in the feed. */
+/** address (lowercase) -> creator, for naming people in posts and comments. */
 export function useCreatorMap() {
   const { data } = useCreators();
   return useMemo(() => new Map((data ?? []).map((c) => [c.creator.toLowerCase(), c])), [data]);
-}
-
-type RawActivity = Omit<Activity, "id" | "kind" | "time"> & { kind: number; time: number };
-
-function toActivity(res: unknown): Activity[] | undefined {
-  const d = res as readonly [readonly bigint[], readonly RawActivity[]] | undefined;
-  if (!d) return undefined;
-  return d[1]
-    .map((a, i) => ({ ...a, id: d[0][i], kind: a.kind as Kind, time: Number(a.time) }))
-    .filter((a) => !isHidden(a.creator) && !isHidden(a.actor));
-}
-
-export function useActivity(limit: number) {
-  const q = useBackingRead("getActivity", [0n, BigInt(limit)]);
-  const data = useMemo(() => toActivity(q.data), [q.data]);
-  return { ...q, data };
-}
-
-export function useCreatorActivity(addr: `0x${string}` | undefined, limit: number) {
-  const q = useBackingRead("getCreatorActivity", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
-  const data = useMemo(() => toActivity(q.data), [q.data]);
-  return { ...q, data };
-}
-
-export function useCasts(addr?: `0x${string}`) {
-  const q = useBackingRead("getCasts", [addr ?? ZERO], !!addr);
-  const data = useMemo(
-    () => [...((q.data as CastStat[] | undefined) ?? [])].sort((a, b) => (b.backed > a.backed ? 1 : b.backed < a.backed ? -1 : 0)),
-    [q.data],
-  );
-  return { ...q, data };
 }
 
 export function useCreator(addr?: `0x${string}`) {
@@ -129,15 +132,69 @@ export function useCreator(addr?: `0x${string}`) {
 
 export function useBackers(addr?: `0x${string}`) {
   const q = useBackingRead("getBackers", [addr ?? ZERO], !!addr);
-  const rows = useMemo(() => {
-    const d = q.data as readonly [readonly `0x${string}`[], readonly bigint[], readonly bigint[]] | undefined;
-    if (!d) return undefined;
-    return d[0]
-      .map((backer, i) => ({ backer, principal: d[1][i], generated: d[2][i] }))
-      .sort((a, b) => (b.principal > a.principal ? 1 : b.principal < a.principal ? -1 : 0));
-  }, [q.data]);
-  return { ...q, rows };
+  const rows = useMemo(
+    () =>
+      [...((q.data as BackerRow[] | undefined) ?? [])].sort((a, b) => (b.principal > a.principal ? 1 : b.principal < a.principal ? -1 : 0)),
+    [q.data],
+  );
+  return { ...q, rows: q.data ? rows : undefined };
 }
+
+export function useCasts(addr?: `0x${string}`) {
+  const q = useBackingRead("getCasts", [addr ?? ZERO], !!addr);
+  const data = useMemo(
+    () => [...((q.data as CastStat[] | undefined) ?? [])].sort((a, b) => (b.backed > a.backed ? 1 : b.backed < a.backed ? -1 : 0)),
+    [q.data],
+  );
+  return { ...q, data };
+}
+
+// ---------------------------------------------------------------- posts and comments
+
+export function usePosts(limit: number) {
+  const q = useBackingRead("getPosts", [0n, BigInt(limit)]);
+  const data = useMemo(() => toPosts(q.data), [q.data]);
+  return { ...q, data };
+}
+
+export function useCreatorPosts(addr: `0x${string}` | undefined, limit: number) {
+  const q = useBackingRead("getCreatorPosts", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
+  const data = useMemo(() => toPosts(q.data), [q.data]);
+  return { ...q, data };
+}
+
+export function usePost(id?: bigint) {
+  const q = useBackingRead("getPost", [id ?? 0n], id !== undefined && id > 0n);
+  const data = useMemo(() => {
+    const d = q.data as readonly [RawActivity, RawStats] | undefined;
+    if (!d || id === undefined) return undefined;
+    const [a] = toActivities([id], [d[0]]);
+    if (!a) return undefined;
+    return { ...a, stats: { backed: d[1].backed, backings: Number(d[1].backings), comments: Number(d[1].comments) } } as Post;
+  }, [q.data, id]);
+  return { ...q, data };
+}
+
+export function useComments(postId?: bigint) {
+  const q = useBackingRead("getComments", [postId ?? 0n, 0n, 200n], postId !== undefined && postId > 0n);
+  const data = useMemo(() => {
+    const d = q.data as readonly [readonly bigint[], readonly RawActivity[]] | undefined;
+    return d ? toActivities(d[0], d[1]) : undefined;
+  }, [q.data]);
+  return { ...q, data };
+}
+
+/** Everything that happened to a creator, newest first: their notifications. */
+export function useCreatorActivity(addr: `0x${string}` | undefined, limit: number) {
+  const q = useBackingRead("getCreatorActivity", [addr ?? ZERO, 0n, BigInt(limit)], !!addr);
+  const data = useMemo(() => {
+    const d = q.data as readonly [readonly bigint[], readonly RawActivity[]] | undefined;
+    return d ? toActivities(d[0], d[1]) : undefined;
+  }, [q.data]);
+  return { ...q, data };
+}
+
+// ---------------------------------------------------------------- positions
 
 export function usePosition(backer?: `0x${string}`, creator?: `0x${string}`) {
   const q = useBackingRead("getPosition", [backer ?? ZERO, creator ?? ZERO], !!backer && !!creator);
@@ -157,8 +214,7 @@ export function useStats() {
 
 /**
  * apr: the vault's actual rate (drives live tickers). On demo networks this is deliberately sped up.
- * incomeApr: the rate used for "est. per month" figures — a realistic vault APY on demo networks,
- * so we never show inflated income projections.
+ * incomeApr: the rate used for "a month" figures — a realistic APY on demo networks.
  */
 export function useApr(): { apr: number; estimated: boolean; incomeApr: number; demo: boolean } {
   const { net } = useNet();
@@ -177,15 +233,13 @@ export function useApr(): { apr: number; estimated: boolean; incomeApr: number; 
     staleTime: 10 * 60_000,
     retry: false,
     queryFn: async () => {
-      // Compare the vault's share price now vs ~3 days ago (Base: 2s blocks).
       const now = await client!.getBlockNumber();
-      const lookback = 129_600n;
+      const lookback = 129_600n; // ~3 days of 2s blocks
       const one = 10n ** 18n;
       const read = (blockNumber?: bigint) =>
         client!.readContract({ address: d!.vault, abi: demoVaultAbi, functionName: "convertToAssets", args: [one], blockNumber });
       const [a, b] = await Promise.all([read(now - lookback), read(now)]);
-      const growth = Number(b) / Number(a) - 1;
-      const apr = growth * (365 / 3);
+      const apr = (Number(b) / Number(a) - 1) * (365 / 3);
       if (!isFinite(apr) || apr <= 0 || apr > 1) throw new Error("bad apr");
       return apr;
     },
@@ -211,6 +265,8 @@ export function useLive(value: number, perSecond: number, at: number) {
   if (!at) return value;
   return value + (perSecond * Math.max(0, now - at)) / 1000;
 }
+
+// ---------------------------------------------------------------- transactions
 
 export type TxStep = { label: string; run: () => Promise<`0x${string}`> };
 export type TxState = { status: "idle" | "pending" | "success" | "error"; message?: string; hash?: `0x${string}` };
@@ -238,7 +294,7 @@ export function useTx() {
       }
       let hash: `0x${string}` | undefined;
       for (let i = 0; i < steps.length; i++) {
-        const prefix = steps.length > 1 ? `Step ${i + 1}/${steps.length}: ` : "";
+        const prefix = steps.length > 1 ? `Step ${i + 1} of ${steps.length}: ` : "";
         setState({ status: "pending", message: `${prefix}${steps[i].label}. Confirm in your wallet` });
         hash = await steps[i].run();
         setState({ status: "pending", message: `${prefix}${steps[i].label}. Waiting for the network`, hash });

@@ -1,160 +1,171 @@
 # Backing
 
-**Back creators with money you keep.** Fans stake USDC behind a creator on Base instead of tipping. The USDC goes into an audited ERC-4626 lending vault. The creator gets the yield, the fan's principal stays theirs, and the fan can withdraw all of it any time.
+**Back creators with money you keep.** Fans stake USDC behind a creator on Base instead of tipping. The USDC goes into an audited ERC-4626 lending vault. The creator gets the yield, the fan's principal stays theirs, and the fan can take it back.
 
 > Your capital works the night shift.
 
-Built for Vibestarter Vibeathon 02 ("Night shift"). It runs as a website and as a **Base App mini app** from the same code.
+Built for Vibestarter Vibeathon 02 ("Night shift"). It runs as a social website and as a **Base App mini app** from the same code, and it plugs into **X**.
 
 ## What you can do
 
 - **Sign in with a wallet.** No password: Base Account (Face ID or fingerprint), a browser wallet, or WalletConnect. Inside Base App you're signed in automatically.
-- **Feed.** *Following* shows activity from the creators you back. *Everyone* shows all of Backing: creator updates, backings with the backer's note, milestones, claims and new creators.
-- **Discover.** Search creators by name or username and sort them by backing, earnings or newest.
-- **Back a creator** with an optional public note. If you opened Backing from a cast in Base App, the backing remembers that cast.
-- **Creator profile.** A live earnings counter, "the block" (one lit window per backer, brighter for bigger backers), updates, backers, and the casts that brought in backing.
-- **My backing.** Everything you've staked, the yield it has sent, and withdraw buttons.
-- **Studio** (for creators). Set up a profile (it auto-fills from your Base App profile), claim yield each epoch, post updates to your backers' feeds, and share or cast your profile.
-- **Base App extras.** Profile links show as cards with a "Back them" button, one-tap casting, haptics, and "Add to your apps".
+- **Home feed, like X.** *Everyone* and *Following* tabs. Following shows posts from creators you back. Every post has **Back** (where a like would be), **comments** and **share**.
+- **Back a creator** from any post or profile:
+  - pick an amount
+  - pick a length: 1 hour, 1 day, 1 week, 1 month, or ongoing
+  - optionally **lock** it for that length, as a stronger promise
+  - add a public note
 
-Everything lives on-chain, so there's no server and no database. The feed reads straight from the contract.
+  Flexible backings can be withdrawn any time. When a timed backing ends, it can be closed and the money goes back to the fan.
+- **Comments.** Anyone signed in can comment. People who back that creator get a lit-window **Backer** badge.
+- **Notifications.** Who backed you, comments on your posts, milestones, and timed backings that have ended.
+- **Profiles, like X.** A banner, picture, bio, X link, stats, a live earnings counter, and tabs for **Posts**, **Backers** (with their notes) and **About**.
+- **Studio** for creators:
+  - claim yield each epoch
+  - **post with a picture**, a link, or **one of your X posts**
+  - upload a profile picture and banner
+  - **link your X account**
+- **Discover.** Search by name or **@X username**. If someone isn't on Backing yet, **Invite on X** opens a ready-made post tagging them.
+- **Base App.** Profile and post links show as cards with a "Back them" button. One-tap casting, haptics, and "Add to your apps".
+- **Security page** at `/security` summarising how we tried to break the contract (see [SECURITY.md](SECURITY.md)).
 
-## How it works
+Everything except picture uploads lives on-chain: profiles, posts, comments, backings and the activity feed. There's no database.
 
-1. A creator registers a profile (stored on-chain).
-2. A fan approves USDC and calls `back(creator, amount, cast, note)`. The contract deposits it into the vault.
-3. Yield builds up. The contract attributes it to creators in proportion to the principal behind each one.
-4. The creator calls `claim()` once per epoch.
-5. The fan calls `unback` / `unbackAll` any time and gets 100% of their principal back.
-6. Creators call `post(text, link)` to reach their backers. Every join, backing, claim, update and milestone is appended to an on-chain activity log that the feed reads.
+## How X works here (no paid API)
 
-Yield attribution uses a single "yield per unit of principal" accumulator (MasterChef-style). Rounding always favours the contract, so a few wei of dust stay in the vault as a buffer. A 512-run fuzz test checks that after random back/unback/claim sequences, every fan exits with exactly their principal and every creator receives exactly what they were shown.
+- **Link your X:** Studio gives you a short code (`bk-xxxxxxxx`). You post it from your X account and paste the post's link. Our server reads that public post through X's free oEmbed endpoint and checks the author and the code. Only your wallet can save the handle to your profile, so a match proves the same person controls both. Linked accounts get a check mark.
+- **X posts in the feed:** paste one of your X post links into a Backing post. It shows as a card with the post's text and a "View on X" link, and backers can Back you right from it.
+- **Invite on X / share on X** use X's standard "post" links.
+
+Pulling *all* of a creator's X posts in automatically would need X's paid developer API and a server. It's listed under "Coming next".
 
 ## Repo layout
 
 ```
 contracts/            Foundry project
-  src/Backing.sol       the protocol: staking, yield attribution, profiles, updates, activity feed
+  src/Backing.sol       staking, yield attribution, timed/locked backings, profiles, posts, comments, activity
   src/mocks/            Test USDC (faucet) + demo ERC-4626 vault with sped-up yield. Testnet/local only
   script/Deploy.s.sol   MODE=demo (mocks) or MODE=live (real vault). Writes web/src/deployments/<chainId>.json
-  script/Seed.s.sol     fills a demo deployment with 4 sample creators, 6 backers and 4 updates
-  test/                 24 tests incl. fuzzing, plus an opt-in mainnet-fork test against a real vault
+  script/Seed.s.sol     4 sample creators, posts with pictures, comments and backings
+  test/                 43 tests: unit, attacks, fuzzing and invariants (see SECURITY.md)
 web/                  Next.js 15 + wagmi 2 + viem + Tailwind 4 + Farcaster mini app SDK
-  src/app/              / (landing or feed), /discover, /c/[address], /me, /creator (studio)
-  src/app/.well-known/farcaster.json   the Base App manifest
-  src/app/api/card      the 3:2 share card image (creator name, backing, lit windows)
-  src/deployments/      contract addresses per chain (written by the deploy script, commit these)
+  src/app/              / (feed), /discover, /notifications, /me, /creator (studio), /c/[address], /p/[id], /security
+  src/app/api/upload    picture uploads (wallet-signed) to Vercel Blob
+  src/app/api/x/*       X post previews and X account linking, via X's public oEmbed
+  src/app/api/card      share card image (3:2) for Base App and social previews
+  public/demo/          four demo pictures used by the seed script
 scripts-local.sh      one-command local chain + deploy + seed
 ```
 
 ## Prerequisites
 
 - Node 20+ and npm
-- Foundry: `curl -L https://foundry.paradigm.xyz | bash && foundryup` (on Windows, run this in Git Bash or WSL)
+- Foundry, installed from **Git Bash** or WSL on Windows: `curl -L https://foundry.paradigm.xyz | bash`, then `foundryup`
 
-> **Never paste a private key or seed phrase into a chat, an issue, a commit or a `.env` file that gets pushed.** The commands below use Foundry's encrypted keystore, so your key never appears in plain text.
+> **Never paste a private key or seed phrase into a chat, an issue, a commit or a `.env` file that gets pushed.** The commands below use Foundry's encrypted keystore.
 
 ## 1. Run it locally
 
 ```bash
-# terminal 1 (Git Bash or WSL): local chain + contracts + sample data
-cd contracts && forge test        # 24 tests should pass
-cd .. && MY_WALLET=0xYourWalletAddress ./scripts-local.sh
+# terminal 1 (Git Bash): tests, then a local chain with sample data
+cd contracts && forge test        # 43 tests should pass
+cd .. && MY_WALLET=0xYourWalletAddress bash scripts-local.sh
 
-# terminal 2: the app
+# terminal 2 (PowerShell or any shell): the app
 cd web
-npm install
+npm ci
 npm run dev                       # http://localhost:3000
 ```
 
-In your wallet, add a network with RPC `http://127.0.0.1:8545` and chain ID `31337`. `MY_WALLET` received 10 test ETH for gas. In the app, pick **Local** in the network menu, sign in with **Browser wallet**, tap **Get 1,000 test USDC**, then back a creator.
+In your wallet, add a network with RPC `http://127.0.0.1:8545` and chain ID `31337`. Pick **Local** in the network menu, sign in with **Browser wallet**, and tap **Get 1,000 test USDC**.
 
-If you restart Anvil, re-run the script. Addresses are deterministic, so nothing in `web/` changes.
+- **Pictures in local dev** are saved in `web/public/uploads` (git-ignored). No Blob store is needed.
+- **Demo post pictures:** run the seed with `SEED_IMAGE_BASE=http://localhost:3000/demo` (the local script does this).
 
 ## 2. Deploy the testnet demo (Base Sepolia)
 
-This is the version judges can try for free. It uses Test USDC and a demo vault at 3,650% a year, so income visibly ticks up. The UI labels this, and "a month" figures use a realistic 5%.
+The version judges can try for free. It uses Test USDC and a demo vault at 3,650% a year, so income visibly moves. The UI labels this, and "a month" figures use a realistic 5%.
 
 ```bash
 cd contracts
-cast wallet import deployer --interactive      # paste the deployer key once; it's stored encrypted
+cast wallet import deployer --interactive      # once; the key is stored encrypted
 # fund that address with a little Base Sepolia ETH (Coinbase Developer Platform faucet)
 
 forge script script/Deploy.s.sol --rpc-url base_sepolia --account deployer --broadcast
-forge script script/Seed.s.sol   --rpc-url base_sepolia --account deployer --broadcast --slow --gas-estimate-multiplier 200
+SEED_IMAGE_BASE=https://YOUR-SITE.vercel.app/demo \
+forge script script/Seed.s.sol --rpc-url base_sepolia --account deployer --broadcast --slow --gas-estimate-multiplier 200
 ```
 
-This writes `web/src/deployments/84532.json`. Commit it. Claims open every 2 minutes on the demo (`EPOCH_SECONDS` overrides this).
+This writes `web/src/deployments/84532.json`. Commit and push it.
+
+- **Redeploying** is fine: a new contract starts empty. Run Seed again for sample content.
+- **Claims** open every 2 minutes on the demo (`EPOCH_SECONDS` overrides this).
 
 ## 3. Deploy on Base mainnet (real USDC, real vault)
 
-1. **Pick a vault.** Open a USDC vault on Base in the Morpho app (or one of Moonwell's Morpho-curated vaults). Copy its address and cross-check it on basescan.org. Prefer a large, established curator with real liquidity, because your users' withdrawals depend on it.
-2. **Check it on-chain:**
+1. **Pick a vault.** Open a USDC vault on Base in the Morpho app. Cross-check the address on basescan.org. Prefer a large, established curator.
+2. **Check it:**
    ```bash
-   cast call $VAULT "asset()(address)" --rpc-url base   # must be 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913 (USDC)
+   cast call $VAULT "asset()(address)" --rpc-url base   # must be 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
    cast call $VAULT "totalAssets()(uint256)" --rpc-url base
+   BASE_RPC_URL=https://mainnet.base.org VAULT=$VAULT forge test --match-contract Fork -vv
    ```
-3. **Fork-test against it** (no money moves): `BASE_RPC_URL=https://mainnet.base.org VAULT=$VAULT forge test --match-contract Fork -vv`
-4. **Deploy.** The script refuses if the vault's asset isn't USDC or the vault is empty.
+3. **Deploy:**
    ```bash
    MODE=live VAULT=$VAULT forge script script/Deploy.s.sol --rpc-url base --account deployer --broadcast
    ```
-   This writes `web/src/deployments/8453.json`. Set `NEXT_PUBLIC_VAULT_NAME` to the vault's name. The epoch defaults to 1 day.
-5. **Smoke test with small amounts** ($1–5). This contract is unaudited.
+   The script refuses if the vault isn't USDC or is empty. Set `NEXT_PUBLIC_VAULT_NAME`.
+4. **Smoke test with $1–5.** This contract is unaudited.
 
 ## 4. Put the site online (Vercel)
 
 1. Push to GitHub with the `deployments/*.json` files committed.
-2. In Vercel: **Add New → Project**, import the repo, set **Root Directory = `web`**.
-3. Add the env vars from `web/.env.example`. At minimum set `NEXT_PUBLIC_SITE_URL` to your Vercel URL (no trailing slash).
-4. Deploy. The network menu shows every network that has a deployment file. Testnet is the default.
+2. In Vercel: **Add New → Project**, import the repo, **Root Directory = `web`**.
+3. Set the env vars from `web/.env.example`. At minimum, `NEXT_PUBLIC_SITE_URL` = your Vercel URL (no trailing slash).
+4. **Picture uploads:** in the Vercel project, open **Storage → Create → Blob**, and connect it to the project. That adds `BLOB_READ_WRITE_TOKEN` for you. Redeploy. Check Vercel's free-tier limits for Blob.
+5. Deploy.
 
 ## 5. Base App setup (mini app)
 
-The code is ready: the manifest is at `/.well-known/farcaster.json`, and every page carries the `fc:miniapp` card tags. Both were checked against the official schema in `@farcaster/miniapp-core`. What's left is proving you own the domain:
+The manifest is at `/.well-known/farcaster.json`, and pages carry the `fc:miniapp` card tags. Both were validated against `@farcaster/miniapp-core`'s schema.
 
-1. Deploy to Vercel first, and set `NEXT_PUBLIC_SITE_URL` to that exact URL. The signature is tied to the domain, so use the domain you'll submit.
-2. Follow Base's current mini app guide (docs.base.org, "Mini Apps") to **sign your domain** with your Base App / Farcaster account. It gives you three values: `header`, `payload`, `signature`.
-3. Put them in Vercel as `FARCASTER_HEADER`, `FARCASTER_PAYLOAD`, `FARCASTER_SIGNATURE` and redeploy. If the guide asks for an owner address, also set `BASE_BUILDER_OWNER`.
-4. Open `https://your-site/.well-known/farcaster.json` to check the values are there, then use Base's preview tool from the guide.
-5. Test: cast a creator's profile link in Base App. It should show the card with a **Back them** button.
+1. Deploy to Vercel and set `NEXT_PUBLIC_SITE_URL` to that exact URL.
+2. Follow Base's current mini app guide (docs.base.org, "Mini Apps") to **sign your domain** with your Base App / Farcaster account. You'll get `header`, `payload` and `signature`.
+3. Put them in Vercel as `FARCASTER_HEADER`, `FARCASTER_PAYLOAD`, `FARCASTER_SIGNATURE` (plus `BASE_BUILDER_OWNER` if the guide asks), and redeploy.
+4. Cast a creator's profile link in Base App. It should show a card with **Back them**.
 
-Notes:
-- Base App's built-in wallet may not support Base Sepolia. If it doesn't, the app says so and suggests switching network. The free testnet demo still works in any browser.
-- The Base App username and ID a creator saves come from Base App itself and aren't independently verified. The app labels them as Base App usernames, not as verified accounts.
+Base App's wallet may not support Base Sepolia. If it doesn't, the app says so. The testnet demo always works in a browser.
 
 ## Vibeathon submission checklist
 
-Submit at app.vibestarter.xyz/vibeathon/submit, signed in with the wallet you applied with, **before Mon 9 Nov 2026, 22:00 UTC (11pm in Lagos)**. You can edit your entry until then.
+Submit at app.vibestarter.xyz/vibeathon/submit with the wallet you applied with, **before Mon 9 Nov 2026, 22:00 UTC (11pm in Lagos)**. You can edit until then.
 
 - **Project name:** Backing
 - **Tagline:** "Back creators with money you keep: your USDC stays yours, its yield pays them."
-- **Live URL:** your Vercel URL (the testnet demo works end to end)
-- **What it does / what to try:**
+- **Live URL:** your Vercel URL
+- **What to try:**
   1. Sign in (Base Account works with a passkey), tap **Get 1,000 test USDC**.
-  2. Open **Discover**, pick a creator, back them with 100 tUSDC and a note. Watch "Earned from backers" tick up and a window light up.
-  3. Your **Feed** now follows them. Open **My backing** and withdraw. You get 100% back.
-  4. Open **Studio**, create a profile, post an update, claim your yield.
-  5. In Base App: cast a creator's profile link and back them from the card.
-- **AI tools:** Claude (Cowork) for the contracts, app and tests, plus the [unslop](https://github.com/heydamir/unslop) design skill by Damir Sokolovsky for the visual pass.
-- **Optional:** repo link, a 60–90s video of the flow above, a screenshot, your X handle, a Fundable score link.
-
-**Demo moment:** two windows, a creator's Studio and a fan. The fan backs with a note, the note appears in the feed, a window lights up, and "Ready to claim" starts ticking. The fan withdraws everything, the ticker freezes, and the fan's wallet shows the full principal back.
+  2. On **Home**, open a post and tap **Back**. Pick 100 tUSDC, **1 week**, tick **Lock**, add a note. The post's Back count goes up and a window lights up on their profile.
+  3. Comment on the post. You get a **Backer** badge.
+  4. Open **Following**: it now shows that creator. Open **My backing** to see the lock.
+  5. Open **Studio**: create a profile, upload a picture, link your X, post with a picture, claim yield.
+  6. **Discover**: search an @X username that isn't on Backing and tap **Invite on X**.
+  7. Read **/security**: how we tried to break it.
+- **AI tools:** Claude (Cowork) for the contracts, app, tests and security testing, plus the [unslop](https://github.com/heydamir/unslop) design skill by Damir Sokolovsky for the visual pass.
+- **Optional:** repo link, a 60–90s video, a screenshot, your X handle, a Fundable score link.
 
 ## Coming next
 
-- Read creators' real Base App casts into the feed (needs a data provider and a small server)
+- Automatic import of creators' X posts (X developer API plus a server)
 - Verified Base App identity with Quick Auth
-- Notifications when someone backs you or a creator posts
-- An indexer for scale (the app reads the contract directly, which is fine for hundreds of creators)
-- Multiple vaults per creator, and a mainnet launch with an audit
+- Push notifications
+- An indexer for scale
+- Moving pictures to IPFS
+- An independent audit before larger mainnet amounts
 
-## Security notes and known limits
+## Security
 
-- Unaudited hackathon code. Principal sits in a third-party ERC-4626 vault: smart-contract, curator and liquidity risk all apply. If the vault takes a loss, yield stops until it recovers. Withdrawals are first come, first served.
-- Updates, notes and profiles are public, on-chain and can't be deleted. Hide abusive wallets from the site with `NEXT_PUBLIC_HIDDEN_ADDRESSES`. Picture links are shown as-is (https only).
-- Creators can't back themselves. Anyone can donate vault shares to the contract; donations become creator yield.
-- Regulatory framing: fans keep 100% of principal and earn no return; creators receive the yield on capital fans choose to lend them. Don't market it as an investment.
+See [SECURITY.md](SECURITY.md): 43 tests including 12 attack tests, fuzzing and invariants. Three issues were found and fixed during that testing. Unaudited: keep mainnet amounts small.
 
 ## Credits
 

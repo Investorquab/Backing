@@ -65,11 +65,39 @@ export function errMsg(e: unknown): string {
     NothingToClaim: "Nothing to claim yet",
     AlreadyRegistered: "This wallet already has a creator profile",
     InvalidProfile: "Check your profile. A name is required and the bio fits in 280 characters",
-    InvalidPost: "Updates need text, up to 280 characters",
+    InvalidPost: "Posts need text, a picture or a link. Text fits in 280 characters",
+    InvalidComment: "Comments fit in 280 characters",
+    UnknownPost: "That post doesn't exist",
+    InvalidDuration: "Pick a length to lock for",
+    Locked: "This backing is locked until its end date",
+    NotEnded: "This backing hasn't ended yet",
+    DepositLoss: "The vault's share price looks off right now, so we stopped the deposit to protect you. Try again later",
     NoteTooLong: "Notes fit in 140 characters",
     FaucetCooldown: "The faucet works once an hour",
     NotRegistered: "That address isn't a creator",
   };
   for (const k of Object.keys(map)) if (m.includes(k)) return map[k];
   return m.split("\n")[0];
+}
+
+export const DURATIONS = [
+  { label: "1 hour", secs: 3600 },
+  { label: "1 day", secs: 86_400 },
+  { label: "1 week", secs: 604_800 },
+  { label: "1 month", secs: 2_592_000 },
+  { label: "Ongoing", secs: 0 },
+] as const;
+
+/** Human summary of a position's terms. */
+export function terms(endsAt: bigint | number, lockedUntil: bigint | number, now = Math.floor(Date.now() / 1000)) {
+  const end = Number(endsAt);
+  const lock = Number(lockedUntil);
+  if (!end) return lock > now ? { label: `Locked for ${countdown(lock - now)}`, ended: false, locked: true } : { label: "Ongoing", ended: false, locked: false };
+  if (now >= end) return { label: "Ended", ended: true, locked: false };
+  if (lock > now) return { label: `Locked, ends in ${countdown(end - now)}`, ended: false, locked: true };
+  return { label: `Ends in ${countdown(end - now)}`, ended: false, locked: false };
+}
+
+export function dateLabel(ts: number | bigint) {
+  return new Date(Number(ts) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }

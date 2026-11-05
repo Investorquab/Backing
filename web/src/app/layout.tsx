@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Header, TabBar } from "@/components/Header";
-import { NetBanner } from "@/components/NetBanner";
+import { MobileTopBar, RightRail, Sidebar, TabBar } from "@/components/Shell";
+import { BackDialog } from "@/components/BackDialog";
+import { ComposeDialog } from "@/components/Composer";
 import { SITE_URL } from "@/lib/networks";
 import { miniAppEmbed } from "@/lib/embed";
 
 const title = "Backing";
-const description = "Back creators with money you keep. Stake USDC on Base, the yield goes to them, and you can withdraw every cent any time.";
+const description = "Back creators with money you keep. Stake USDC on Base, the yield goes to them, and you can withdraw every cent.";
 
 export const metadata: Metadata = {
   title: { default: "Backing: back creators with money you keep", template: "%s · Backing" },
@@ -19,21 +20,22 @@ export const metadata: Metadata = {
   other: miniAppEmbed({ imageUrl: `${SITE_URL}/card.png`, title: "Open Backing", url: SITE_URL }),
 };
 
-export const viewport: Viewport = { themeColor: "#07080d", width: "device-width", initialScale: 1, viewportFit: "cover" };
+export const viewport: Viewport = { themeColor: "#0b0d14", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body className="font-sans antialiased">
         <Providers>
-          <Header />
-          <NetBanner />
-          <main className="mx-auto w-full max-w-6xl px-4 pb-40 pt-6 sm:px-6 sm:pt-8 md:pb-24">{children}</main>
-          <footer className="mx-auto max-w-6xl px-4 pb-28 text-[12px] leading-relaxed text-muted sm:px-6 md:pb-10">
-            Backing is experimental software built for Vibestarter Vibeathon 02. Principal sits in a third-party ERC-4626 vault and carries smart-contract and vault
-            risk. Backers earn no return, the yield goes to creators. Not financial advice
-          </footer>
+          <MobileTopBar />
+          <div className="mx-auto flex w-full max-w-[1280px] justify-center">
+            <Sidebar />
+            <main className="min-h-dvh w-full min-w-0 max-w-[600px] border-[var(--line)] pb-32 md:border-x md:pb-16">{children}</main>
+            <RightRail />
+          </div>
           <TabBar />
+          <BackDialog />
+          <ComposeDialog />
         </Providers>
       </body>
     </html>

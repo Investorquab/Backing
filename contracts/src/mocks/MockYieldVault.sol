@@ -25,11 +25,23 @@ contract MockYieldVault is ERC4626 {
         lastDrip = block.timestamp;
     }
 
+    /// @dev Virtual shares make the empty-vault inflation attack uneconomic, as real vaults do.
+    function _decimalsOffset() internal pure override returns (uint8) {
+        return 6;
+    }
+
     function setApr(uint256 aprBps_) external {
         require(msg.sender == owner, "owner");
         _drip();
         aprBps = aprBps_;
         emit AprUpdated(aprBps_);
+    }
+
+    /// @notice Test-only: make the vault lose `amount` of its assets (e.g. a bad loan) to test loss sharing.
+    function simulateLoss(uint256 amount) external {
+        require(msg.sender == owner, "owner");
+        _drip();
+        IERC20(asset()).transfer(address(0xdead), amount);
     }
 
     function pendingDrip() public view returns (uint256) {

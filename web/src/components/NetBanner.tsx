@@ -23,14 +23,14 @@ export function NetBanner() {
     query: { enabled: !!d && !!address, refetchInterval: 8000 },
   });
 
-  const wrap = (children: React.ReactNode) => <div className="mx-auto mt-4 max-w-6xl px-4 sm:px-6">{children}</div>;
+  const wrap = (children: React.ReactNode) => <div className="border-b border-[var(--line)] px-4 py-3">{children}</div>;
 
-  if (!d) return wrap(<div className="surface p-4 text-[14px] text-fg-2">Backing isn&apos;t deployed on {net.chain.name} yet. The README explains how to deploy it</div>);
+  if (!d) return wrap(<div className="text-[14px] text-fg-2">Backing isn&apos;t deployed on {net.chain.name} yet. The README explains how to deploy it</div>);
 
   const hostLacksChain = mini.inMiniApp && mini.chains.length > 0 && !mini.chains.includes(`eip155:${net.chain.id}`);
   if (hostLacksChain)
     return wrap(
-      <div className="surface p-4 text-[14px] text-fg-2">
+      <div className="text-[14px] text-fg-2">
         This app&apos;s wallet doesn&apos;t support {net.chain.name}. Pick another network at the top, or open Backing in a browser to try the free demo
       </div>,
     );
@@ -39,7 +39,7 @@ export function NetBanner() {
 
   return wrap(
     <>
-      <div className="surface flex flex-col gap-3 p-4 text-[14px] sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 text-[13px] sm:flex-row sm:items-center">
         <p className="flex-1 text-fg-2">
           <span className="text-fg">{net.label}.</span> Test USDC and a demo vault running at {Math.round(apr * 100).toLocaleString("en-US")}% a year, so you can watch income move
           {net.key === "sepolia" && (

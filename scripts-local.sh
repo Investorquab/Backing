@@ -10,7 +10,7 @@ ANVIL_PID=$!
 trap 'kill $ANVIL_PID' EXIT
 sleep 2
 forge script script/Deploy.s.sol --rpc-url local --broadcast --private-key $ANVIL_KEY
-SEED_GAS_WEI=10000000000000000 forge script script/Seed.s.sol --rpc-url local --broadcast --private-key $ANVIL_KEY --slow --gas-estimate-multiplier 200
+SEED_IMAGE_BASE=http://localhost:3000/demo SEED_GAS_WEI=10000000000000000 forge script script/Seed.s.sol --rpc-url local --broadcast --private-key $ANVIL_KEY --slow --gas-estimate-multiplier 200
 if [ -n "${MY_WALLET:-}" ]; then
   cast send "$MY_WALLET" --value 10ether --private-key $ANVIL_KEY --rpc-url http://127.0.0.1:8545 >/dev/null
   echo "Sent 10 test ETH to $MY_WALLET"

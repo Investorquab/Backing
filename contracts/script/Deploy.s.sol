@@ -38,6 +38,10 @@ contract Deploy is Script {
             // 3650% APR (10%/day) so income visibly ticks up in a live demo.
             MockYieldVault v = new MockYieldVault(m, vm.envOr("DEMO_APR_BPS", uint256(365_000)));
             m.setMinter(address(v), true);
+            // Seed the demo vault so it's never empty (blocks the empty-vault donation trick).
+            m.mint(msg.sender, 1_000e6);
+            m.approve(address(v), 1_000e6);
+            v.deposit(1_000e6, address(0xdead));
             usdc = address(m);
             vault = address(v);
             epoch = uint64(vm.envOr("EPOCH_SECONDS", uint256(2 minutes)));
