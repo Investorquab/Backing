@@ -1,1 +1,8 @@
-{}
+{
+  "backing": "0x6DD217aF991606e7c65e7FA082a6D914f2b02e3d",
+  "chainId": 84532,
+  "demo": true,
+  "epochSeconds": 120,
+  "usdc": "0xda7C743A57b2478b801Ab12cDB1f0245b7817Fb9",
+  "vault": "0xd81133c76289Df27105E8aF15579631fE305F9E1"
+}
