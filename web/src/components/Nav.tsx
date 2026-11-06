@@ -9,6 +9,7 @@ import { useNotifications } from "@/lib/notifications";
 import { useUi } from "@/lib/ui-state";
 import { captureRef } from "@/lib/invite";
 import { Wordmark } from "./WindowMark";
+import { NetToggle } from "./NetToggle";
 import { SignIn } from "./SignIn";
 
 const LINKS = [
@@ -49,6 +50,7 @@ export function TopBar() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <NetToggle />
           {address && (
             <Link href="/notifications" className="relative flex h-10 w-10 items-center justify-center rounded-full text-fg-2 hover:bg-raised hover:text-fg" aria-label="Notifications">
               <Bell size={20} strokeWidth={1.5} />
