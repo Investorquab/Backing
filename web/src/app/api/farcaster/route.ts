@@ -7,6 +7,7 @@ import { isAddress } from "viem";
  *   ?op=search&q=vita                  user search (type-ahead)
  *   ?op=byAddress&address=0x..,0x..    the Farcaster account(s) that VERIFIED these wallets
  *   ?op=casts&fid=3&limit=10           a user's recent casts
+ *   ?op=feed&limit=25                  real casts from a curated set of Base builders, merged + newest-first
  * byAddress is the trustless join: Farcaster records which wallets belong to an account, and the
  * Backing contract keys profiles by wallet — so we can link the two with no contract change and
  * no way to spoof someone else's identity.
@@ -14,6 +15,24 @@ import { isAddress } from "viem";
 export const runtime = "nodejs";
 
 const BASE = "https://api.neynar.com/v2/farcaster";
+
+/**
+ * Curated real Base / builder Farcaster accounts for the "On Farcaster" feed.
+ * These are live accounts that post real work — the feed is genuine content, not seeded mock data.
+ * fid, with the handle in a comment so this stays readable/maintainable.
+ */
+const BUILDERS = [
+  99, // jessepollak (Base lead)
+  12142, // base (official)
+  3, // dwr.eth (Dan Romero)
+  3621, // horsefacts.eth
+  12, // linda
+  5650, // vitalik.eth
+  8, // jacob
+];
+
+/** Keep the feed varied: at most this many casts from any one author. */
+const MAX_PER_AUTHOR = 3;
 
 type NeynarUser = {
   fid: number;
@@ -86,6 +105,28 @@ function normCast(c: any): FcCast {
     url: username ? `https://farcaster.xyz/${username}/${String(c?.hash ?? "").slice(0, 10)}` : `https://farcaster.xyz/~/conversations/${c?.hash}`,
   };
 }
+/** A feed cast carries its author so the client can match them to a Backing profile by wallet. */
+export type FcFeedCast = FcCast & {
+  author: { fid: number; username: string; displayName: string; pfp: string; addresses: string[] };
+};
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function normFeedCast(c: any): FcFeedCast {
+  const base = normCast(c);
+  const a = c?.author ?? {};
+  const eth = (a?.verified_addresses?.eth_addresses ?? []).map((x: string) => x.toLowerCase());
+  const custody = a?.custody_address ? [String(a.custody_address).toLowerCase()] : [];
+  return {
+    ...base,
+    author: {
+      fid: a?.fid ?? 0,
+      username: a?.username ?? "",
+      displayName: a?.display_name || a?.username || "",
+      pfp: a?.pfp_url || "",
+      addresses: Array.from(new Set([...eth, ...custody])),
+    },
+  };
+}
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export async function GET(req: Request) {
@@ -134,6 +175,23 @@ export async function GET(req: Request) {
       if (!fid) return Response.json({ error: "fid required" }, { status: 400 });
       const d = await call(`/feed/user/casts?fid=${fid}&limit=${limit}&include_replies=false`);
       return Response.json({ casts: (d?.casts ?? []).map(normCast) }, { headers: cache });
+    }
+    if (op === "feed") {
+      const limit = Math.min(Number(url.searchParams.get("limit")) || 25, 50);
+      // over-fetch so the per-author cap still leaves a full feed
+      const d = await call(`/feed?feed_type=filter&filter_type=fids&fids=${BUILDERS.join(",")}&with_recasts=false&limit=${Math.min(limit * 3, 100)}`);
+      const perAuthor: Record<string, number> = {};
+      const casts: FcFeedCast[] = [];
+      for (const cast of (d?.casts ?? [])
+        .map(normFeedCast)
+        .filter((c: FcFeedCast) => c.author.username && (c.text.trim().length > 0 || c.images.length > 0))
+        .sort((a: FcFeedCast, b: FcFeedCast) => b.timestamp - a.timestamp)) {
+        const n = (perAuthor[cast.author.username] ?? 0) + 1;
+        perAuthor[cast.author.username] = n;
+        if (n <= MAX_PER_AUTHOR) casts.push(cast);
+        if (casts.length >= limit) break;
+      }
+      return Response.json({ casts }, { headers: cache });
     }
     return Response.json({ error: "unknown op" }, { status: 400 });
   } catch {

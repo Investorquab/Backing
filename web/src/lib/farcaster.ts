@@ -23,6 +23,10 @@ export type FcCast = {
   url: string;
 };
 
+export type FcFeedCast = FcCast & {
+  author: { fid: number; username: string; displayName: string; pfp: string; addresses: string[] };
+};
+
 async function get<T>(params: Record<string, string>): Promise<T> {
   const qs = new URLSearchParams(params).toString();
   const r = await fetch(`/api/farcaster?${qs}`);
@@ -50,6 +54,16 @@ export function useCasts(fid?: number, limit = 12) {
     staleTime: 5 * 60_000,
     retry: false,
     queryFn: async () => (await get<{ casts: FcCast[] }>({ op: "casts", fid: String(fid), limit: String(limit) })).casts,
+  });
+}
+
+/** Real casts from a curated set of Base builders, merged + newest-first. The live "On Farcaster" feed. */
+export function useFarcasterFeed(limit = 25) {
+  return useQuery({
+    queryKey: ["fc", "feed", limit],
+    staleTime: 5 * 60_000,
+    retry: false,
+    queryFn: async () => (await get<{ casts: FcFeedCast[] }>({ op: "feed", limit: String(limit) })).casts,
   });
 }
 

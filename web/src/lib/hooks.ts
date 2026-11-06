@@ -156,6 +156,43 @@ export function useProfileAmong(addresses: readonly string[] | undefined) {
   return { ...q, data };
 }
 
+/**
+ * Map of wallet (lowercase) -> Backing profile, for a flat list of candidate wallets.
+ * Used by the "On Farcaster" feed to tell which real builders are already on Backing (show Back)
+ * versus not yet (show Invite). Only joined, non-hidden profiles are included.
+ */
+export function useMembershipMap(addresses: readonly string[] | undefined) {
+  const { net } = useNet();
+  const d = net.deployment;
+  const addrs = useMemo(() => {
+    const uniq = new Set((addresses ?? []).map((a) => a.toLowerCase()).filter((a) => isAddress(a)));
+    return [...uniq] as `0x${string}`[];
+  }, [addresses]);
+  const q = useReadContracts({
+    contracts: addrs.map((a) => ({
+      chainId: net.chain.id,
+      address: d?.backing ?? ZERO,
+      abi: backingAbi,
+      functionName: "getProfile",
+      args: [a],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    })) as any,
+    query: { enabled: !!d && addrs.length > 0, refetchInterval: POLL },
+  });
+  const map = useMemo(() => {
+    const m = new Map<string, ProfileView>();
+    if (!q.data) return m;
+    q.data.forEach((r, i) => {
+      if (r.status === "success") {
+        const p = r.result as unknown as ProfileView;
+        if (p && p.joinedAt > 0n && !isHidden(p.account)) m.set(addrs[i].toLowerCase(), p);
+      }
+    });
+    return m;
+  }, [q.data, addrs]);
+  return { ...q, map };
+}
+
 export function usePosition(backer?: `0x${string}`, creator?: `0x${string}`) {
   const q = useBackingRead("getPosition", [backer ?? ZERO, creator ?? ZERO], !!backer && !!creator);
   return { ...q, data: q.data as PositionView | undefined };

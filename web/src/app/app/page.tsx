@@ -6,9 +6,10 @@ import { useBacking, usePeopleMap, usePosts, usePostsByCreators, useProfile } fr
 import { NetBanner } from "@/components/NetBanner";
 import { PostCard } from "@/components/PostCard";
 import { Composer } from "@/components/Composer";
+import { FarcasterFeed } from "@/components/FarcasterFeed";
 import { Skeleton } from "@/components/ui";
 
-type Tab = "all" | "backing";
+type Tab = "all" | "backing" | "fc";
 
 export default function FeedPage() {
   const { address } = useAccount();
@@ -43,18 +44,23 @@ export default function FeedPage() {
             </Link>
           </div>
         ))}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-[22px] font-medium">Feed</h1>
-        <div className="seg" role="group" aria-label="Show">
-          <button aria-pressed={tab === "all"} onClick={() => setTab("all")}>
+        <div className="seg flex w-full sm:w-auto" role="group" aria-label="Show">
+          <button className="flex-1 whitespace-nowrap sm:flex-none" aria-pressed={tab === "all"} onClick={() => setTab("all")}>
             Everyone
           </button>
-          <button aria-pressed={tab === "backing"} onClick={() => setTab("backing")}>
+          <button className="flex-1 whitespace-nowrap sm:flex-none" aria-pressed={tab === "backing"} onClick={() => setTab("backing")}>
             People I back
+          </button>
+          <button className="flex-1 whitespace-nowrap sm:flex-none" aria-pressed={tab === "fc"} onClick={() => setTab("fc")}>
+            On Farcaster
           </button>
         </div>
       </div>
-      {isLoading ? (
+      {tab === "fc" ? (
+        <FarcasterFeed />
+      ) : isLoading ? (
         <Skeleton className="h-64" />
       ) : shown.length === 0 ? (
         <div className="surface px-6 py-12 text-center">
