@@ -14,8 +14,14 @@ import { WindowMark } from "@/components/WindowMark";
 type Tab = "all" | "backing";
 const YEAR = 365 * 24 * 3600;
 
-export default function Feed() {
-  const { address, status } = useAccount();
+export default function Home() {
+  const { status } = useAccount();
+  if (status === "disconnected") return <Landing />;
+  return <Feed />;
+}
+
+function Feed() {
+  const { address } = useAccount();
   const [tab, setTab] = useState<Tab>("all");
   const [limit, setLimit] = useState(30);
   const { data: posts, isLoading: allLoading } = usePosts(limit);
@@ -29,7 +35,6 @@ export default function Feed() {
 
   return (
     <div className="flex flex-col gap-4">
-      {status === "disconnected" && <Intro />}
       <NetBanner />
       {address && <Composer />}
       <div className="flex items-center justify-between pt-2">
@@ -80,54 +85,69 @@ export default function Feed() {
   );
 }
 
-function Intro() {
+const STEPS: [string, string][] = [
+  ["Stake", "Put USDC behind a creator you believe in"],
+  ["They earn", "It earns yield on Base — the yield streams to them"],
+  ["Withdraw", "Your money stays yours. Take it back any time"],
+];
+
+function Landing() {
   const { stats, dataUpdatedAt } = useStats();
   const { apr } = useApr();
   const tvl = num(stats?.principal);
   return (
-    <section className="surface overflow-hidden">
-      <div className="p-6 sm:p-8">
-        <h1 className="text-[32px] font-medium leading-[1.08] tracking-[-0.02em] sm:text-[40px]">Back creators with money you keep</h1>
-        <p className="mt-3 text-[16px] leading-[1.55] text-fg-2">
-          Tips disappear and creator coins dump. On Backing you stake USDC behind someone you believe in: it earns yield on Base, the yield goes to them, and your money stays
-          yours. Stop backing, take it back
-        </p>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <SignIn big />
-          <Link href="/search" className="btn btn-secondary btn-lg">
-            See creators
-          </Link>
+    <div className="flex flex-col gap-4">
+      <section className="surface overflow-hidden">
+        <div className="p-6 sm:p-8">
+          <h1 className="text-[32px] font-medium leading-[1.08] tracking-[-0.02em] sm:text-[40px]">Back the creators you follow — with money you keep</h1>
+          <p className="mt-3 text-[16px] leading-[1.55] text-fg-2">
+            Tips disappear and creator coins dump. On Backing you stake USDC behind someone you believe in: it earns yield on Base, the yield goes to them, and your money stays
+            yours. Stop backing, take it back
+          </p>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <SignIn big />
+            <Link href="/search" className="btn btn-secondary btn-lg">
+              Find creators
+            </Link>
+          </div>
+          <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {STEPS.map(([t, s], i) => (
+              <li key={t} className="rounded-[12px] bg-raised p-4">
+                <div className="flex items-center gap-2">
+                  <span className="num text-[13px] text-muted">{i + 1}</span>
+                  <span className="text-[14px] font-medium">{t}</span>
+                </div>
+                <p className="mt-1.5 text-[13px] leading-[1.5] text-fg-2">{s}</p>
+              </li>
+            ))}
+          </ol>
         </div>
-        <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {([
-            ["Stake", "Put USDC behind a creator you believe in"],
-            ["They earn", "It earns yield on Base — the yield streams to them"],
-            ["Withdraw", "Your money stays yours. Take it back any time"],
-          ] as const).map(([t, s], i) => (
-            <li key={t} className="rounded-[12px] bg-raised p-4">
-              <div className="flex items-center gap-2">
-                <span className="num text-[13px] text-muted">{i + 1}</span>
-                <span className="text-[14px] font-medium">{t}</span>
-              </div>
-              <p className="mt-1.5 text-[13px] leading-[1.5] text-fg-2">{s}</p>
-            </li>
-          ))}
-        </ol>
-      </div>
-      <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-[var(--line)] px-6 py-4 text-[14px] text-fg-2 sm:px-8">
-        <span>
-          <span className="num text-fg">{stats ? money(tvl) : "—"}</span> backing creators
-        </span>
-        <span className="flex items-center gap-1.5">
-          <WindowMark size={12} />
-          {stats ? (
-            <LiveNumber className="text-fg" value={num(stats.distributed)} perSecond={(tvl * apr) / YEAR} at={dataUpdatedAt} />
-          ) : (
-            <span className="num text-fg">—</span>
-          )}{" "}
-          earned by creators
-        </span>
-      </div>
-    </section>
+        <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-[var(--line)] px-6 py-4 text-[14px] text-fg-2 sm:px-8">
+          <span>
+            <span className="num text-fg">{stats ? money(tvl) : "—"}</span> backing creators
+          </span>
+          <span className="flex items-center gap-1.5">
+            <WindowMark size={12} />
+            {stats ? (
+              <LiveNumber className="text-fg" value={num(stats.distributed)} perSecond={(tvl * apr) / YEAR} at={dataUpdatedAt} />
+            ) : (
+              <span className="num text-fg">—</span>
+            )}{" "}
+            earned by creators
+          </span>
+        </div>
+      </section>
+
+      <section className="surface p-6 sm:p-8">
+        <h2 className="text-[20px] font-medium">Already on Farcaster?</h2>
+        <p className="mt-2 text-[15px] leading-[1.55] text-fg-2">
+          Search any Farcaster creator and their real posts show up here, tied to their wallet — no new account, no reposting. Back the ones you like, or invite the ones who
+          aren&apos;t here yet
+        </p>
+        <Link href="/search" className="btn btn-primary mt-4">
+          Search Farcaster creators
+        </Link>
+      </section>
+    </div>
   );
 }

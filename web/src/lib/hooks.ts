@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { isAddress } from "viem";
 import { useAccount, usePublicClient, useReadContract, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { backingAbi, demoVaultAbi } from "./abi";
@@ -120,6 +121,39 @@ export function useBacking(addr?: `0x${string}`) {
   const q = useBackingRead("getBacking", [addr ?? ZERO], !!addr);
   const rows = useMemo(() => (q.data ? [...(q.data as unknown as PositionView[])].sort(byPrincipal) : undefined), [q.data]);
   return { ...q, rows };
+}
+
+/**
+ * Given candidate wallets (e.g. a Farcaster account's verified addresses), find the first that has a
+ * Backing profile. data: ProfileView when one is on Backing, null when none are, undefined while loading.
+ */
+export function useProfileAmong(addresses: readonly string[] | undefined) {
+  const { net } = useNet();
+  const d = net.deployment;
+  const addrs = useMemo(() => (addresses ?? []).filter((a) => isAddress(a)) as `0x${string}`[], [addresses]);
+  const q = useReadContracts({
+    contracts: addrs.map((a) => ({
+      chainId: net.chain.id,
+      address: d?.backing ?? ZERO,
+      abi: backingAbi,
+      functionName: "getProfile",
+      args: [a],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    })) as any,
+    query: { enabled: !!d && addrs.length > 0, refetchInterval: POLL },
+  });
+  const data = useMemo(() => {
+    if (addrs.length === 0) return null;
+    if (!q.data) return undefined;
+    for (const r of q.data) {
+      if (r.status === "success") {
+        const p = r.result as unknown as ProfileView;
+        if (p && p.joinedAt > 0n && !isHidden(p.account)) return p;
+      }
+    }
+    return null;
+  }, [q.data, addrs.length]);
+  return { ...q, data };
 }
 
 export function usePosition(backer?: `0x${string}`, creator?: `0x${string}`) {

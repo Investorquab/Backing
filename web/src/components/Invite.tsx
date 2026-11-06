@@ -17,11 +17,11 @@ function XGlyph() {
  * "Back them too": share a creator's profile with your invite code on it. When someone backs
  * through your link, it's recorded on-chain that you brought them.
  */
-export function Invite({ username, text }: { username: string; text: string }) {
+export function Invite({ username, text, url: customUrl }: { username: string; text: string; url?: string }) {
   const { address } = useAccount();
   const mini = useMiniApp();
   const [copied, setCopied] = useState(false);
-  const url = inviteLink(username, address);
+  const url = customUrl ?? inviteLink(username, address);
   const copy = async () => {
     await navigator.clipboard.writeText(url);
     setCopied(true);

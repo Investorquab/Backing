@@ -12,8 +12,8 @@ import { Wordmark } from "./WindowMark";
 import { SignIn } from "./SignIn";
 
 const LINKS = [
-  { href: "/", label: "Feed", icon: Home },
-  { href: "/search", label: "Search", icon: Search },
+  { href: "/", label: "Home", icon: Home },
+  { href: "/search", label: "Discover", icon: Search },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
 ];
 const on = (path: string, href: string) => (href === "/" ? path === "/" : path.startsWith(href));
@@ -84,8 +84,8 @@ export function TabBar() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       <div className="flex items-center">
-        {tab("/", "Feed", Home)}
-        {tab("/search", "Search", Search)}
+        {tab("/", "Home", Home)}
+        {tab("/search", "Discover", Search)}
         <div className="flex flex-1 justify-center">
           <button
             onClick={() => (me ? ui.openCompose() : router.push("/profile/edit"))}
