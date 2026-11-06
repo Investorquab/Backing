@@ -98,6 +98,21 @@ function Intro() {
             See creators
           </Link>
         </div>
+        <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {([
+            ["Stake", "Put USDC behind a creator you believe in"],
+            ["They earn", "It earns yield on Base — the yield streams to them"],
+            ["Withdraw", "Your money stays yours. Take it back any time"],
+          ] as const).map(([t, s], i) => (
+            <li key={t} className="rounded-[12px] bg-raised p-4">
+              <div className="flex items-center gap-2">
+                <span className="num text-[13px] text-muted">{i + 1}</span>
+                <span className="text-[14px] font-medium">{t}</span>
+              </div>
+              <p className="mt-1.5 text-[13px] leading-[1.5] text-fg-2">{s}</p>
+            </li>
+          ))}
+        </ol>
       </div>
       <div className="flex flex-wrap gap-x-8 gap-y-2 border-t border-[var(--line)] px-6 py-4 text-[14px] text-fg-2 sm:px-8">
         <span>

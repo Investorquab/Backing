@@ -12,6 +12,7 @@ import { Avatar } from "./Avatar";
 import { SignIn } from "./SignIn";
 import { Invite } from "./Invite";
 import { Withdraw } from "./Withdraw";
+import { WindowMark } from "./WindowMark";
 import { LiveNumber, Skeleton, TxStatus } from "./ui";
 
 const YEAR = 365 * 24 * 3600;
@@ -44,7 +45,7 @@ function BackForm({ creator, username, avatar }: { creator: `0x${string}`; usern
   const tx = useTx();
   const pos = usePosition(address, creator);
   const [amount, setAmount] = useState("");
-  const [done, setDone] = useState<string | null>(null);
+  const [done, setDone] = useState<{ amount: number } | null>(null);
 
   const bal = useReadContract({
     chainId: net.chain.id,
@@ -97,7 +98,7 @@ function BackForm({ creator, username, avatar }: { creator: `0x${string}`; usern
     });
     const msg = `You're backing @${username}. Your ${money(num(units))} stays yours`;
     if (await tx.send(steps, msg)) {
-      setDone(msg);
+      setDone({ amount: num(units) });
       setAmount("");
     }
   }
@@ -110,12 +111,35 @@ function BackForm({ creator, username, avatar }: { creator: `0x${string}`; usern
       </div>
 
       {done ? (
-        <div className="flex flex-col gap-3 rounded-[12px] bg-raised p-4">
-          <p className="text-[15px] text-pos" role="status">
-            {done}
-          </p>
-          <p className="text-[14px] text-fg-2">Back them too: invite a friend. Anyone who backs through your link is counted as yours</p>
-          <Invite username={username} text={`I'm backing @${username} on Backing. My USDC stays mine, the yield goes to them. Back them too`} />
+        <div className="enter flex flex-col gap-3">
+          <div className="flex flex-col items-center gap-3 rounded-[12px] bg-raised px-5 py-6 text-center">
+            <WindowMark size={30} />
+            <p className="text-[18px] font-medium leading-snug" role="status">
+              @{username} is lit. You backed them with <span className="num">{money(done.amount)}</span>
+            </p>
+            <dl className="mt-1 w-full divide-line rounded-[12px] bg-deep px-4 text-left">
+              <div className="flex items-start justify-between gap-4 py-3">
+                <dt className="text-[14px] text-fg-2">Still yours</dt>
+                <dd className="text-right">
+                  <div className="num text-[15px]">{money(done.amount)}</div>
+                  <div className="text-[12px] text-muted">Withdraw any time</div>
+                </dd>
+              </div>
+              <div className="flex items-start justify-between gap-4 py-3">
+                <dt className="text-[14px] text-fg-2">Sending @{username}</dt>
+                <dd className="text-right">
+                  <div className="num text-[15px] text-lamp">about {money((done.amount * incomeApr) / 12)} a month</div>
+                  <div className="text-[12px] text-muted">They never sell a thing</div>
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div className="rounded-[12px] bg-raised p-4">
+            <p className="text-[14px] text-fg-2">Back them too: invite a friend. Anyone who backs through your link is counted as yours</p>
+            <div className="mt-3">
+              <Invite username={username} text={`I'm backing @${username} on Backing. My USDC stays mine, the yield goes to them. Back them too`} />
+            </div>
+          </div>
         </div>
       ) : !isConnected ? (
         <div className="flex flex-col items-start gap-3 rounded-[12px] bg-raised p-4 text-[14px] text-fg-2">

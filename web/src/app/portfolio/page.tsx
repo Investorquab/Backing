@@ -107,6 +107,12 @@ function MyBacking({ address }: { address: `0x${string}` }) {
         </Stat>
         <Stat label="People">{rows?.length ?? 0}</Stat>
       </StatRow>
+      {principal > 0 && (
+        <p className="text-[14px] leading-[1.5] text-fg-2">
+          Your <span className="num text-fg">{money(principal)}</span> is still yours — withdraw any time. The yield it earns goes to creators:{" "}
+          <LiveNumber className="text-fg" value={sent} perSecond={(principal * apr) / YEAR} at={dataUpdatedAt} /> so far, without spending a cent
+        </p>
+      )}
       {notice && (
         <p className="text-[14px] text-pos" role="status">
           {notice}
