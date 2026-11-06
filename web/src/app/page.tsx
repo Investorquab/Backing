@@ -76,8 +76,8 @@ export default function Landing() {
       <section className="surface p-6 sm:p-8">
         <h2 className="text-[20px] font-medium">Why backing, not tipping</h2>
         <p className="mt-2 text-[15px] leading-[1.55] text-fg-2">
-          No-loss support has been tried before. Backing is the version built for creators: recurring, onchain, no platform cut, and plugged straight into where they already
-          post on Farcaster.
+          No-loss support has been tried before, as prize savings and one-off public-goods rounds. Backing is the first built as ongoing patronage for individual creators:
+          yield they claim every epoch, onchain with no platform cut, viral &ldquo;back them too&rdquo; invites, and it plugs straight into where they already post on Farcaster.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-[12px] bg-raised p-4">
@@ -124,6 +124,12 @@ export default function Landing() {
             </p>
           </div>
         </div>
+        <p className="mt-4 rounded-[12px] border border-lamp/30 bg-raised p-4 text-[14px] leading-[1.55] text-fg-2">
+          <span className="font-medium text-fg">The math backers weigh:</span> a $25 tip is gone the moment it&apos;s sent. $25 backing a creator earns them yield for as long
+          as it stays, and the backer keeps every cent. A few hundred backers is thousands of USDC working for the creator every day, with no one ever out of pocket. Nothing is
+          locked, so a fan can back ten creators and still withdraw any of it the instant they want it back. That is why people back instead of paying directly: it costs them
+          nothing but the upside.
+        </p>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
@@ -131,7 +137,7 @@ export default function Landing() {
           <div className="text-[13px] text-lamp">For creators</div>
           <h3 className="mt-1 text-[17px] font-medium">Recurring income, no selling, no dumping</h3>
           <p className="mt-2 text-[14px] leading-[1.55] text-fg-2">
-            Link your Farcaster and your posts show here. Fans back you, and you earn the yield on their stake every epoch: steady support instead of one-off tips.
+            Link your Farcaster and your posts show here. Fans back you, and you earn the yield on their stake every epoch: income that compounds as more people back you, instead of one-off tips that are spent once.
           </p>
         </div>
         <div className="surface p-6">
