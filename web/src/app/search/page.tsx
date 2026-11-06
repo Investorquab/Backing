@@ -87,7 +87,7 @@ function FarcasterResults({ q, recents, onChoose, onPick }: { q: string; recents
           </div>
         )}
         <div className="surface px-6 py-12 text-center text-fg-2">
-          Type a Farcaster handle to find anyone — then back them, or invite them to Backing if they&apos;re not here yet
+          Type a Farcaster handle to find anyone, then back them, or invite them to Backing if they&apos;re not here yet
         </div>
       </div>
     );

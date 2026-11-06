@@ -32,9 +32,14 @@ export function xIntent(text: string, url?: string) {
   return `https://x.com/intent/post?${q.toString()}`;
 }
 
-/** Open the Farcaster composer with text and an optional embedded link. */
+/**
+ * Open the Farcaster composer with text and an optional embedded link.
+ * Built by hand (not URLSearchParams) because the composer needs the literal `embeds[]` key.
+ * URLSearchParams would percent-encode the brackets to `embeds%5B%5D`, which Farcaster ignores,
+ * dropping the prefilled cast and bouncing to the home page.
+ */
 export function warpcastIntent(text: string, url?: string) {
-  const q = new URLSearchParams({ text });
-  if (url) q.set("embeds[]", url);
-  return `https://farcaster.xyz/~/compose?${q.toString()}`;
+  const parts = [`text=${encodeURIComponent(text)}`];
+  if (url) parts.push(`embeds[]=${encodeURIComponent(url)}`);
+  return `https://farcaster.xyz/~/compose?${parts.join("&")}`;
 }

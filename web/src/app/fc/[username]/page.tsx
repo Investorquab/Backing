@@ -89,7 +89,7 @@ export default function FarcasterProfilePage() {
           ) : (
             <div className="flex flex-col gap-3">
               <p className="text-[14px] text-fg-2">
-                <span className="font-medium text-fg">Not on Backing yet.</span> Invite them — when they join and link this Farcaster account, their backers can support them with money that stays the
+                <span className="font-medium text-fg">Not on Backing yet.</span> Invite them: when they join and link this Farcaster account, their backers can support them with money that stays the
                 backer&apos;s own.
               </p>
               <Invite
@@ -97,7 +97,7 @@ export default function FarcasterProfilePage() {
                 url={inviteUrl}
                 farcasterHandle={fc.username}
                 xHandle={fc.x}
-                text="your followers can back you on Backing — they keep their money, you earn the yield. Claim your profile:"
+                text="your followers can back you on Backing. They keep their money, you earn the yield. Claim your profile:"
               />
             </div>
           )}

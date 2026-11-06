@@ -13,7 +13,7 @@ import { Skeleton } from "./ui";
 
 /**
  * The "On Farcaster" feed: real casts from Base builders, not seeded mock data.
- * Each author is matched to a Backing profile by their verified wallet — on Backing → Back,
+ * Each author is matched to a Backing profile by their verified wallet: on Backing → Back,
  * not yet → Invite. This is the funding-layer thesis made visible: back the creators who are
  * already here, invite the ones who aren't.
  */

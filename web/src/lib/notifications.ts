@@ -9,7 +9,7 @@ const KEY = (net: string, a: string) => `backing:seen:${net}:${a.toLowerCase()}`
 /**
  * Shared "last seen notification id" store. It is synced to localStorage and, crucially,
  * shared across every component that reads it (the top-bar bell and the notifications page),
- * so marking notifications read clears the badge everywhere at once — not just after a reload.
+ * so marking notifications read clears the badge everywhere at once, not just after a reload.
  * Reading it synchronously via useSyncExternalStore also avoids the first-paint flash where the
  * bell briefly showed every notification as unread before localStorage was read.
  */

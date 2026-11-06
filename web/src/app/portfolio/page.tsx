@@ -109,7 +109,7 @@ function MyBacking({ address }: { address: `0x${string}` }) {
       </StatRow>
       {principal > 0 && (
         <p className="text-[14px] leading-[1.5] text-fg-2">
-          Your <span className="num text-fg">{money(principal)}</span> is still yours — withdraw any time. The yield it earns goes to creators:{" "}
+          Your <span className="num text-fg">{money(principal)}</span> is still yours, withdraw any time. The yield it earns goes to creators:{" "}
           <LiveNumber className="text-fg" value={sent} perSecond={(principal * apr) / YEAR} at={dataUpdatedAt} /> so far, without spending a cent
         </p>
       )}

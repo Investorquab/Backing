@@ -35,7 +35,7 @@ export function FarcasterConnect({ handle }: { handle?: string }) {
         <div className="flex items-start gap-2 text-[14px] text-pos">
           <BadgeCheck size={16} strokeWidth={2} className="mt-0.5 shrink-0" />
           <span>
-            Verified as <span className="font-medium">@{verified.username}</span> — this wallet is linked on Farcaster. Your casts and the verified badge show on your profile.
+            Verified as <span className="font-medium">@{verified.username}</span>. This wallet is linked on Farcaster, so your casts and the verified badge show on your profile.
           </span>
         </div>
       ) : linked ? (
@@ -43,12 +43,12 @@ export function FarcasterConnect({ handle }: { handle?: string }) {
           <div className="flex items-start gap-2 text-[14px] text-pos">
             <BadgeCheck size={16} strokeWidth={2} className="mt-0.5 shrink-0" />
             <span>
-              <span className="font-medium">@{linked.username}</span> is verified on this wallet — casts and the badge show on your profile.
+              <span className="font-medium">@{linked.username}</span> is verified on this wallet, so casts and the badge show on your profile.
             </span>
           </div>
         ) : (
           <div className="text-[14px] text-fg-2">
-            Linked as <span className="font-medium text-fg">@{linked.username}</span> — your casts show on your profile and fans can find you by handle. For the verified ✓ badge, add this
+            Linked as <span className="font-medium text-fg">@{linked.username}</span>. Your casts show on your profile and fans can find you by handle. For the verified ✓ badge, add this
             wallet (<span className="num text-fg">{short(address)}</span>) as a verified address on Farcaster, then press Check again.
           </div>
         )

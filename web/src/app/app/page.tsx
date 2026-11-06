@@ -34,9 +34,9 @@ export default function FeedPage() {
         ) : (
           <div className="surface flex flex-col items-start gap-3 p-5">
             <div>
-              <div className="text-[17px] font-medium">Welcome — set up your profile</div>
+              <div className="text-[17px] font-medium">Welcome, set up your profile</div>
               <p className="mt-1 text-[14px] text-fg-2">
-                Create a profile to post, link your Farcaster and start getting backed. It takes a few seconds — we&apos;ll fill in what we can from your Farcaster.
+                Create a profile to post, link your Farcaster and start getting backed. It takes a few seconds, and we&apos;ll fill in what we can from your Farcaster.
               </p>
             </div>
             <Link href="/profile/edit" className="btn btn-primary">

@@ -265,7 +265,7 @@ export function useStats() {
 
 /**
  * apr: the vault's actual rate (drives live tickers). On demo networks this is deliberately sped up.
- * incomeApr: the rate used for "a month" figures — a realistic APY on demo networks.
+ * incomeApr: the rate used for "a month" figures, a realistic APY on demo networks.
  */
 export function useApr(): { apr: number; estimated: boolean; incomeApr: number; demo: boolean } {
   const { net } = useNet();

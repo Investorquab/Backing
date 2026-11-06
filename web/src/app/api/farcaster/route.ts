@@ -1,7 +1,7 @@
 import { isAddress } from "viem";
 
 /**
- * GET /api/farcaster — a thin, cached proxy to Neynar so the NEYNAR_API_KEY stays server-side.
+ * GET /api/farcaster: a thin, cached proxy to Neynar so the NEYNAR_API_KEY stays server-side.
  * Ops:
  *   ?op=user&username=dwr              one Farcaster user
  *   ?op=search&q=vita                  user search (type-ahead)
@@ -9,7 +9,7 @@ import { isAddress } from "viem";
  *   ?op=casts&fid=3&limit=10           a user's recent casts
  *   ?op=feed&limit=25                  real casts from a curated set of Base builders, merged + newest-first
  * byAddress is the trustless join: Farcaster records which wallets belong to an account, and the
- * Backing contract keys profiles by wallet — so we can link the two with no contract change and
+ * Backing contract keys profiles by wallet, so we can link the two with no contract change and
  * no way to spoof someone else's identity.
  */
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ const BASE = "https://api.neynar.com/v2/farcaster";
 
 /**
  * Curated real Base / builder Farcaster accounts for the "On Farcaster" feed.
- * These are live accounts that post real work — the feed is genuine content, not seeded mock data.
+ * These are live accounts that post real work, so the feed is genuine content, not seeded mock data.
  * fid, with the handle in a comment so this stays readable/maintainable.
  */
 const BUILDERS = [

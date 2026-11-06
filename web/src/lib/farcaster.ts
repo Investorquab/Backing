@@ -34,7 +34,7 @@ async function get<T>(params: Record<string, string>): Promise<T> {
   return r.json();
 }
 
-/** The Farcaster account that has verified `address`, if any. Trustless — the account can't be faked. */
+/** The Farcaster account that has verified `address`, if any. Trustless: the account can't be faked. */
 export function useFarcaster(address?: string) {
   const a = address?.toLowerCase();
   return useQuery({
