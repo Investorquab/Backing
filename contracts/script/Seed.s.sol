@@ -31,10 +31,16 @@ contract Seed is Script {
             "UI and motion for onchain apps. Night shift only. Prints for backers."
         ];
         string[4] memory posts = [
-            "Night 3 of Vibeathon. Vault integration shipped: backers withdraw to the cent, creators keep the yield. Base gas is so cheap I deployed six times today.",
-            "PSA for the hackathon crowd: test your ERC-4626 round-trips before mainnet. Caught a fee-on-withdraw vault at 2am. Backing just refuses those at deploy.",
+            "Night 3 of Vibeathon. Shipped the vault flow: backers withdraw to the cent, creators keep the yield. Base gas is cheap enough that I redeployed six times today without blinking.",
+            "PSA for the hackathon crowd: test your ERC-4626 round-trips before mainnet. Caught a fee-on-withdraw vault at 2am that would quietly short every backer. Backing refuses vaults like that at deploy.",
             "3am in Lagos. The timeline is asleep, the build finally works, and the tests are green. This is the hour.",
             "New profile cards tonight: lit-window motif, amber accent, mono numbers. Dark UI that doesn't burn your eyes at 2am."
+        ];
+        string[4] memory posts2 = [
+            "The thing that finally clicked tonight: backing is not tipping. Your USDC earns yield in a lending vault, the creator takes the yield, and you pull your principal out whenever you want. Support with zero downside.",
+            "Ran the fuzz suite 10k times while the coffee brewed. 34 tests, 4 invariants, all green. If a backer could ever withdraw less than they put in, one of these would fail. They do not.",
+            "Wired up invite links tonight. Share your profile, and whoever backs through it credits you onchain. No backend, it all lives in the contract. Small thing, feels great.",
+            "Designed the 'your money is still yours' moment for the backing flow. People should feel that the downside is zero before they ever confirm. Copy and motion doing the heavy lifting."
         ];
         string[3] memory fanNames = ["onchain_amara", "tunde_backs", "zee_onbase"];
 
@@ -57,6 +63,7 @@ contract Seed is Script {
             backing.saveProfile(Backing.Profile({username: users[i], baseName: bases[i], avatar: "", bio: bios[i], link: ""}));
             string memory picture = bytes(img).length > 0 ? string.concat(img, "/night-", vm.toString(i), ".webp") : "";
             backing.post(posts[i], picture);
+            backing.post(posts2[i], ""); // second post, text-only, for a fuller and more varied feed
             vm.stopBroadcast();
         }
         // three of the fans have profiles too, so backer lists show names
@@ -77,6 +84,6 @@ contract Seed is Script {
             if (i < 3) backing.back(vm.addr(ck[(i + 1) % 4]), amounts[i] / 2, address(0));
             vm.stopBroadcast();
         }
-        console2.log("Seeded 4 creators, 3 fan profiles, 4 posts and 9 backings");
+        console2.log("Seeded 4 creators, 3 fan profiles, 8 posts and 9 backings");
     }
 }
