@@ -139,6 +139,24 @@ function Landing() {
       </section>
 
       <section className="surface p-6 sm:p-8">
+        <h2 className="text-[20px] font-medium">Why backing, not tipping</h2>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-[12px] bg-raised p-4">
+            <div className="text-[13px] text-muted">Tips</div>
+            <p className="mt-1.5 text-[14px] text-fg-2">Sent once, sold, gone. Nothing left behind</p>
+          </div>
+          <div className="rounded-[12px] bg-raised p-4">
+            <div className="text-[13px] text-muted">Creator coins</div>
+            <p className="mt-1.5 text-[14px] text-fg-2">Pump, dump, and the trust goes with it</p>
+          </div>
+          <div className="rounded-[12px] border border-lamp/40 bg-raised p-4">
+            <div className="text-[13px] text-lamp">Backing</div>
+            <p className="mt-1.5 text-[14px] text-fg">Your money stays yours — only the yield supports them. Zero downside</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="surface p-6 sm:p-8">
         <h2 className="text-[20px] font-medium">Already on Farcaster?</h2>
         <p className="mt-2 text-[15px] leading-[1.55] text-fg-2">
           Search any Farcaster creator and their real posts show up here, tied to their wallet — no new account, no reposting. Back the ones you like, or invite the ones who

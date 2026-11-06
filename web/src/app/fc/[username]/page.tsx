@@ -86,7 +86,9 @@ export default function FarcasterProfilePage() {
               <Invite
                 username={fc.username}
                 url={inviteUrl}
-                text={`Hey @${fc.username} — your followers can back you on Backing. Your supporters keep their money, you earn the yield. Come claim your profile:`}
+                farcasterHandle={fc.username}
+                xHandle={fc.x}
+                text="your followers can back you on Backing — they keep their money, you earn the yield. Claim your profile:"
               />
             </div>
           )}

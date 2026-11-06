@@ -25,16 +25,16 @@ contract Seed is Script {
         string[4] memory users = ["nocturnebeats", "graveyardshift", "the3amdev", "moonlitpixels"];
         string[4] memory bases = ["nocturne.base.eth", "graveyard.base.eth", "3amdev.base.eth", "moonlit.base.eth"];
         string[4] memory bios = [
-            "Lo-fi for people who work while the city sleeps. Demo profile",
-            "A weekly webcomic about night-shift nurses, cabbies and bakers. Demo profile",
-            "Building open-source tools live, midnight to 3am WAT. Demo profile",
-            "Pixel art of empty streets and neon signs. Demo profile"
+            "Lo-fi for people who work while the city sleeps. New mix every Friday night.",
+            "A weekly webcomic about night-shift nurses, cabbies and bakers.",
+            "Building open-source tools live on Base, midnight to 3am WAT.",
+            "Pixel art of empty streets and neon signs. Prints for backers."
         ];
         string[4] memory posts = [
-            "New mix is up: two hours of slow tape loops for whoever is still awake",
-            "Episode 14 is live. Ada finally finishes her shift at the 24h pharmacy",
-            "Streaming tonight from 00:00 WAT, fixing the indexer bug live",
-            "Finished the Lagos night market series. Prints next week"
+            "New mix is up: two hours of slow tape loops for whoever is still awake. Made it in one sitting after my shift.",
+            "Episode 14 is live. Ada finally clocks out of the 24h pharmacy and catches the last bus home.",
+            "Shipped the whole backend tonight, midnight to 3am. Base deploys are so cheap I stopped counting. Streaming the next one.",
+            "Finished the Lagos night-market series: neon, rain, empty streets. Prints next week for everyone backing the work."
         ];
         string[3] memory fanNames = ["ada_reads", "tunde_nights", "zee_builds"];
 
@@ -63,7 +63,7 @@ contract Seed is Script {
         for (uint256 i; i < 3; i++) {
             if (backing.hasProfile(vm.addr(fk[i]))) continue;
             vm.startBroadcast(fk[i]);
-            backing.saveProfile(Backing.Profile({username: fanNames[i], baseName: "", avatar: "", bio: "Backer. Demo profile", link: ""}));
+            backing.saveProfile(Backing.Profile({username: fanNames[i], baseName: "", avatar: "", bio: "Here for the night-shift crew.", link: ""}));
             vm.stopBroadcast();
         }
 

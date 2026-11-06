@@ -11,6 +11,7 @@ import { useMiniApp } from "@/lib/miniapp";
 import { useUpload } from "@/lib/upload";
 import { isUsername } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
+import { FarcasterConnect } from "@/components/FarcasterConnect";
 import { SignIn } from "@/components/SignIn";
 import { Skeleton, TxStatus } from "@/components/ui";
 
@@ -155,6 +156,7 @@ function Editor({ existing }: { existing?: Form }) {
         </div>
         <TxStatus state={tx.state} />
       </div>
+      <FarcasterConnect />
     </div>
   );
 }

@@ -12,15 +12,33 @@ import { Skeleton } from "@/components/ui";
 type Mode = "farcaster" | "backing";
 type Sort = "backing" | "earned" | "new";
 
+const RECENT_KEY = "backing:recentfc";
+
 export default function Search() {
   const [q, setQ] = useState("");
   const [mode, setMode] = useState<Mode>("farcaster");
+  const [recents, setRecents] = useState<string[]>([]);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("q");
     if (fromUrl) setQ(fromUrl);
     if (params.get("on") === "backing") setMode("backing");
+    try {
+      setRecents(JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"));
+    } catch {}
   }, []);
+
+  const addRecent = (t: string) => {
+    const term = t.trim();
+    if (!term) return;
+    setRecents((prev) => {
+      const next = [term, ...prev.filter((x) => x.toLowerCase() !== term.toLowerCase())].slice(0, 6);
+      try {
+        localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,19 +62,33 @@ export default function Search() {
           On Backing
         </button>
       </div>
-      {mode === "farcaster" ? <FarcasterResults q={q} /> : <BackingResults q={q} />}
+      {mode === "farcaster" ? <FarcasterResults q={q} recents={recents} onChoose={setQ} onPick={addRecent} /> : <BackingResults q={q} />}
     </div>
   );
 }
 
 /** Live Farcaster user search. Each result opens the creator page, where you back them or invite them. */
-function FarcasterResults({ q }: { q: string }) {
+function FarcasterResults({ q, recents, onChoose, onPick }: { q: string; recents: string[]; onChoose: (t: string) => void; onPick: (t: string) => void }) {
   const { data, isLoading, isError } = useFarcasterSearch(q);
   const term = q.trim();
   if (term.length < 2)
     return (
-      <div className="surface px-6 py-12 text-center text-fg-2">
-        Type a Farcaster handle to find anyone — then back them, or invite them to Backing if they&apos;re not here yet
+      <div className="flex flex-col gap-4">
+        {recents.length > 0 && (
+          <div>
+            <div className="mb-2 text-[13px] text-muted">Recent searches</div>
+            <div className="flex flex-wrap gap-2">
+              {recents.map((r) => (
+                <button key={r} className="btn btn-secondary btn-sm" onClick={() => onChoose(r)}>
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="surface px-6 py-12 text-center text-fg-2">
+          Type a Farcaster handle to find anyone — then back them, or invite them to Backing if they&apos;re not here yet
+        </div>
       </div>
     );
   if (isLoading) return <Skeleton className="h-64" />;
@@ -66,7 +98,7 @@ function FarcasterResults({ q }: { q: string }) {
     <ol className="surface divide-line overflow-hidden">
       {data.map((u) => (
         <li key={u.fid}>
-          <Link href={`/fc/${u.username}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-raised/60">
+          <Link href={`/fc/${u.username}`} onClick={() => onPick(term)} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-raised/60">
             <FcAvatar pfp={u.pfp} name={u.username} size={44} />
             <div className="min-w-0 flex-1">
               <div className="truncate font-medium">{u.displayName}</div>

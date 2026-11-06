@@ -31,3 +31,10 @@ export function xIntent(text: string, url?: string) {
   if (url) q.set("url", url);
   return `https://x.com/intent/post?${q.toString()}`;
 }
+
+/** Open the Farcaster (Warpcast) composer with text and an optional embedded link. */
+export function warpcastIntent(text: string, url?: string) {
+  const q = new URLSearchParams({ text });
+  if (url) q.set("embeds[]", url);
+  return `https://warpcast.com/~/compose?${q.toString()}`;
+}

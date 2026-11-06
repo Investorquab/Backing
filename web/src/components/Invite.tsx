@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAccount } from "wagmi";
 import { Link2, Share } from "lucide-react";
 import { useMiniApp } from "@/lib/miniapp";
-import { inviteLink, xIntent } from "@/lib/invite";
+import { inviteLink, warpcastIntent, xIntent } from "@/lib/invite";
 
 function XGlyph() {
   return (
@@ -14,29 +14,57 @@ function XGlyph() {
 }
 
 /**
- * "Back them too": share a creator's profile with your invite code on it. When someone backs
- * through your link, it's recorded on-chain that you brought them.
+ * Share an invite link. On a profile it's a "back them too" referral link.
+ * When inviting a Farcaster creator, pass `farcasterHandle` (and `xHandle` if they have one) so the
+ * share posts to Farcaster and @mentions them where they actually are.
  */
-export function Invite({ username, text, url: customUrl }: { username: string; text: string; url?: string }) {
+export function Invite({
+  username,
+  text,
+  url: customUrl,
+  farcasterHandle,
+  xHandle,
+}: {
+  username: string;
+  text: string;
+  url?: string;
+  farcasterHandle?: string;
+  xHandle?: string;
+}) {
   const { address } = useAccount();
   const mini = useMiniApp();
   const [copied, setCopied] = useState(false);
   const url = customUrl ?? inviteLink(username, address);
+  const fcText = farcasterHandle ? `@${farcasterHandle} ${text}` : text;
+  const xText = xHandle ? `@${xHandle} ${text}` : text;
+  const showFarcaster = !!farcasterHandle;
+  const showX = showFarcaster ? !!xHandle : true;
+
   const copy = async () => {
     await navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   };
+
   return (
     <div className="flex flex-wrap gap-2">
       {mini.inMiniApp ? (
-        <button className="btn btn-secondary btn-sm" onClick={() => mini.composeCast(text, url)}>
+        <button className="btn btn-secondary btn-sm" onClick={() => mini.composeCast(fcText, url)}>
           <Share size={15} strokeWidth={1.5} /> Cast it
         </button>
       ) : (
-        <a className="btn btn-secondary btn-sm" href={xIntent(text, url)} target="_blank" rel="noreferrer">
-          <XGlyph /> Share on X
-        </a>
+        <>
+          {showFarcaster && (
+            <a className="btn btn-secondary btn-sm" href={warpcastIntent(fcText, url)} target="_blank" rel="noreferrer">
+              <Share size={15} strokeWidth={1.5} /> Invite on Farcaster
+            </a>
+          )}
+          {showX && (
+            <a className="btn btn-secondary btn-sm" href={xIntent(xText, url)} target="_blank" rel="noreferrer">
+              <XGlyph /> {showFarcaster ? "Invite on X" : "Share on X"}
+            </a>
+          )}
+        </>
       )}
       <button className="btn btn-quiet btn-sm" onClick={copy}>
         <Link2 size={15} strokeWidth={1.5} /> {copied ? "Link copied" : "Copy invite link"}
