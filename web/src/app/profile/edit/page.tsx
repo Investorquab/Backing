@@ -9,6 +9,7 @@ import { useProfile, useTx, ZERO } from "@/lib/hooks";
 import { useNet } from "@/lib/net";
 import { useMiniApp } from "@/lib/miniapp";
 import { useUpload } from "@/lib/upload";
+import { farcasterHandleFromLink } from "@/lib/farcaster";
 import { isUsername } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { FarcasterConnect } from "@/components/FarcasterConnect";
@@ -86,6 +87,13 @@ function Editor({ existing }: { existing?: Form }) {
   const set = (k: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setF((s) => ({ ...s, [k]: k === "username" ? e.target.value.toLowerCase().replace(/^@/, "").replace(/\s/g, "") : k === "link" || k === "baseName" ? e.target.value.trim() : e.target.value }));
 
+  // The profile's single link field holds the creator's Farcaster handle (as a farcaster.xyz URL).
+  const fcHandle = farcasterHandleFromLink(f.link) ?? "";
+  const setFcHandle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const h = e.target.value.toLowerCase().replace(/^@/, "").replace(/[^a-z0-9_.-]/g, "").slice(0, 32);
+    setF((s) => ({ ...s, link: h ? `https://farcaster.xyz/${h}` : "" }));
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-[22px] font-medium">{existing ? "Edit profile" : "Create your profile"}</h1>
@@ -140,9 +148,12 @@ function Editor({ existing }: { existing?: Form }) {
           <textarea className="input min-h-24" value={f.bio} onChange={set("bio")} placeholder="What you make, and what backing helps you do" />
         </label>
         <label className="flex flex-col gap-2 text-[14px]">
-          <span className="text-fg-2">Link, optional</span>
-          <input className="input" value={f.link} onChange={set("link")} placeholder="https://" />
-          {!linkOk && <span className="text-[12px] text-neg">Links start with https://</span>}
+          <span className="text-fg-2">Farcaster username, optional</span>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">@</span>
+            <input className="input pl-7" value={fcHandle} onChange={setFcHandle} placeholder="yourhandle" autoCapitalize="none" />
+          </div>
+          <span className="text-[12px] text-muted">Shows your Farcaster posts on your profile, and lets fans find and back you by your handle</span>
         </label>
         <div className="flex gap-2">
           <button className="btn btn-primary btn-lg px-6" disabled={!valid || tx.state.status === "pending"} onClick={save}>
@@ -156,7 +167,7 @@ function Editor({ existing }: { existing?: Form }) {
         </div>
         <TxStatus state={tx.state} />
       </div>
-      <FarcasterConnect />
+      <FarcasterConnect handle={fcHandle} />
     </div>
   );
 }

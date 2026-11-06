@@ -16,8 +16,9 @@ const YEAR = 365 * 24 * 3600;
 
 export default function Home() {
   const { status } = useAccount();
-  if (status === "disconnected") return <Landing />;
-  return <Feed />;
+  // Anyone not actively connected (disconnected, connecting, reconnecting) sees the site, not the app.
+  if (status === "connected") return <Feed />;
+  return <Landing />;
 }
 
 function Feed() {
@@ -99,6 +100,15 @@ function Landing() {
     <div className="flex flex-col gap-4">
       <section className="surface overflow-hidden">
         <div className="p-6 sm:p-8">
+          <div className="mb-6 flex gap-1.5" aria-hidden>
+            {Array.from({ length: 18 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-7 w-5 rounded-[2px]"
+                style={{ background: [2, 5, 6, 9, 12, 13, 16].includes(i) ? "var(--color-lamp)" : "var(--color-raised)" }}
+              />
+            ))}
+          </div>
           <h1 className="text-[32px] font-medium leading-[1.08] tracking-[-0.02em] sm:text-[40px]">Back the creators you follow — with money you keep</h1>
           <p className="mt-3 text-[16px] leading-[1.55] text-fg-2">
             Tips disappear and creator coins dump. On Backing you stake USDC behind someone you believe in: it earns yield on Base, the yield goes to them, and your money stays
@@ -156,6 +166,23 @@ function Landing() {
         </div>
       </section>
 
+      <section className="grid gap-4 sm:grid-cols-2">
+        <div className="surface p-6">
+          <div className="text-[13px] text-lamp">For creators</div>
+          <h3 className="mt-1 text-[17px] font-medium">Recurring income, no selling, no dumping</h3>
+          <p className="mt-2 text-[14px] leading-[1.55] text-fg-2">
+            Link your Farcaster and your posts show here. Fans back you, and you earn the yield on their stake every epoch — steady support instead of one-off tips.
+          </p>
+        </div>
+        <div className="surface p-6">
+          <div className="text-[13px] text-lamp">For backers</div>
+          <h3 className="mt-1 text-[17px] font-medium">Support with zero downside</h3>
+          <p className="mt-2 text-[14px] leading-[1.55] text-fg-2">
+            Your principal never leaves your control — withdraw it in full any time. Only the yield it earns goes to the creator. You lose nothing to support someone.
+          </p>
+        </div>
+      </section>
+
       <section className="surface p-6 sm:p-8">
         <h2 className="text-[20px] font-medium">Already on Farcaster?</h2>
         <p className="mt-2 text-[15px] leading-[1.55] text-fg-2">
@@ -166,6 +193,18 @@ function Landing() {
           Search Farcaster creators
         </Link>
       </section>
+
+      <footer className="flex flex-wrap items-center justify-between gap-3 px-2 py-6 text-[13px] text-muted">
+        <span>Backing — built for Vibeathon 02 · Night shift</span>
+        <span className="flex gap-4">
+          <a className="hover:text-fg" href="https://blog.vibestarter.xyz/vibeathon-02" target="_blank" rel="noreferrer">
+            Vibeathon
+          </a>
+          <a className="hover:text-fg" href="https://github.com/Investorquab/Backing" target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+        </span>
+      </footer>
     </div>
   );
 }

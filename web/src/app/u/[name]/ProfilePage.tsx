@@ -6,7 +6,7 @@ import { isAddress } from "viem";
 import { useAccount } from "wagmi";
 import { BadgeCheck, CalendarDays, Link2 } from "lucide-react";
 import { useApr, useBackers, useBacking, usePeopleMap, usePostsBy, useProfile, useProfileByUsername, type PositionView, type ProfileView } from "@/lib/hooks";
-import { useFarcaster } from "@/lib/farcaster";
+import { useProfileFarcaster } from "@/lib/farcaster";
 import { badges, money, num, short } from "@/lib/format";
 import { useNet } from "@/lib/net";
 import { useUi } from "@/lib/ui-state";
@@ -56,10 +56,10 @@ function Profile({ p, at }: { p: ProfileView; at: number }) {
   const { rows: backingRows } = useBacking(p.account);
   const { rows: mine } = useBacking(address);
   const { data: posts } = usePostsBy(p.account, 50);
-  const fc = useFarcaster(p.account);
+  const fc = useProfileFarcaster(p.account, p.profile.link);
   const [picked, setPicked] = useState<Tab | null>(null);
   // Lead with Farcaster casts when the creator is on Farcaster, until they pick a tab themselves.
-  const tab: Tab = picked ?? (fc.data ? "casts" : "posts");
+  const tab: Tab = picked ?? (fc.user ? "casts" : "posts");
 
   const myBacking = useMemo(() => new Set((mine ?? []).map((r) => r.creator.toLowerCase())), [mine]);
   const isMe = address?.toLowerCase() === p.account.toLowerCase();
@@ -75,15 +75,15 @@ function Profile({ p, at }: { p: ProfileView; at: number }) {
           <div className="min-w-0 flex-1 pt-1">
             <h1 className="truncate text-[24px] font-medium leading-tight">@{u}</h1>
             {p.profile.baseName && <div className="truncate text-[15px] text-fg-2">{p.profile.baseName}</div>}
-            {fc.data && (
+            {fc.user && (
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px]">
-                <span className="inline-flex items-center gap-1 text-lamp" title="Verified: this wallet is linked on Farcaster">
-                  <BadgeCheck size={14} strokeWidth={2} /> @{fc.data.username} on Farcaster
+                <span className={`inline-flex items-center gap-1 ${fc.verified ? "text-lamp" : "text-fg-2"}`} title={fc.verified ? "Verified: this wallet is linked on Farcaster" : "Linked on Farcaster (not wallet-verified)"}>
+                  {fc.verified && <BadgeCheck size={14} strokeWidth={2} />} @{fc.user.username} on Farcaster
                 </span>
-                <span className="num text-muted">{fc.data.followerCount.toLocaleString()} followers</span>
-                {fc.data.x && (
-                  <a className="text-muted hover:text-fg" href={`https://x.com/${fc.data.x}`} target="_blank" rel="noreferrer nofollow">
-                    X @{fc.data.x}
+                <span className="num text-muted">{fc.user.followerCount.toLocaleString()} followers</span>
+                {fc.user.x && (
+                  <a className="text-muted hover:text-fg" href={`https://x.com/${fc.user.x}`} target="_blank" rel="noreferrer nofollow">
+                    X @{fc.user.x}
                   </a>
                 )}
               </div>
@@ -138,7 +138,7 @@ function Profile({ p, at }: { p: ProfileView; at: number }) {
       </section>
 
       <div className="seg self-start" role="group" aria-label="Profile">
-        {fc.data && (
+        {fc.user && (
           <button aria-pressed={tab === "casts"} onClick={() => setPicked("casts")}>
             Casts
           </button>
@@ -154,7 +154,7 @@ function Profile({ p, at }: { p: ProfileView; at: number }) {
         </button>
       </div>
 
-      {tab === "casts" && fc.data && <Casts fid={fc.data.fid} address={p.account} username={u} avatar={p.profile.avatar} />}
+      {tab === "casts" && fc.user && <Casts fid={fc.user.fid} address={p.account} username={fc.user.username} pfp={fc.user.pfp} />}
 
       {tab === "posts" &&
         (posts && posts.length ? (

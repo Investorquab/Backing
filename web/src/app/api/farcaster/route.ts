@@ -83,7 +83,7 @@ function normCast(c: any): FcCast {
     likes: c?.reactions?.likes_count ?? 0,
     recasts: c?.reactions?.recasts_count ?? 0,
     replies: c?.replies?.count ?? 0,
-    url: username ? `https://warpcast.com/${username}/${String(c?.hash ?? "").slice(0, 10)}` : `https://warpcast.com/~/conversations/${c?.hash}`,
+    url: username ? `https://farcaster.xyz/${username}/${String(c?.hash ?? "").slice(0, 10)}` : `https://farcaster.xyz/~/conversations/${c?.hash}`,
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */

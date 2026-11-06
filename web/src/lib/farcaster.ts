@@ -65,6 +65,32 @@ export function useFarcasterSearch(q: string) {
   });
 }
 
+/** Pull a Farcaster handle out of a profile link (farcaster.xyz/x, warpcast.com/x, or a bare @handle). */
+export function farcasterHandleFromLink(link?: string): string | null {
+  if (!link) return null;
+  const s = link.trim();
+  const m = s.match(/(?:farcaster\.xyz|warpcast\.com)\/(?:@)?([a-z0-9_.-]+)/i);
+  if (m) return m[1].toLowerCase().replace(/\.$/, "");
+  return null;
+}
+
+/**
+ * A Backing creator's Farcaster account, resolved two ways:
+ *  - verified: their Backing wallet is a verified address on the account (trustless, gets the badge)
+ *  - linked: they typed their handle into their profile (self-declared, no badge)
+ */
+export function useProfileFarcaster(address?: string, link?: string) {
+  const byAddr = useFarcaster(address);
+  const handle = farcasterHandleFromLink(link);
+  const byHandle = useFarcasterUser(byAddr.data ? undefined : handle ?? undefined);
+  if (byAddr.data) return { user: byAddr.data, verified: true, isLoading: false };
+  if (byHandle.data) {
+    const verified = !!address && byHandle.data.addresses.includes(address.toLowerCase());
+    return { user: byHandle.data, verified, isLoading: false };
+  }
+  return { user: null, verified: false, isLoading: byAddr.isLoading || byHandle.isLoading };
+}
+
 /** One Farcaster user by exact username. */
 export function useFarcasterUser(username?: string) {
   const u = username?.toLowerCase().replace(/^@/, "");

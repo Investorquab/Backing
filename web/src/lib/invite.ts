@@ -32,9 +32,9 @@ export function xIntent(text: string, url?: string) {
   return `https://x.com/intent/post?${q.toString()}`;
 }
 
-/** Open the Farcaster (Warpcast) composer with text and an optional embedded link. */
+/** Open the Farcaster composer with text and an optional embedded link. */
 export function warpcastIntent(text: string, url?: string) {
   const q = new URLSearchParams({ text });
   if (url) q.set("embeds[]", url);
-  return `https://warpcast.com/~/compose?${q.toString()}`;
+  return `https://farcaster.xyz/~/compose?${q.toString()}`;
 }
