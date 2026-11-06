@@ -19,6 +19,8 @@ export function safeImage(url?: string): string | null {
     const host = u.hostname.toLowerCase();
     const site = new URL(SITE_URL).hostname.toLowerCase();
     if (host === site || host === "localhost") return url;
+    // Always trust images served from the same origin the app is loaded from (covers alternate vercel.app domains).
+    if (typeof window !== "undefined" && host === window.location.hostname.toLowerCase()) return url;
     if (EXTRA.some((h) => host === h || host.endsWith("." + h))) return url;
     return null;
   } catch {
