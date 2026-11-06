@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
-import { LogOut, PieChart, Shield, UserRound, UserRoundPen } from "lucide-react";
+import { LogOut, PieChart, UserRound, UserRoundPen } from "lucide-react";
 import { short } from "@/lib/format";
 import { useMiniApp } from "@/lib/miniapp";
 import { useProfile } from "@/lib/hooks";
@@ -64,9 +64,6 @@ export function SignIn({ big = false }: { big?: boolean }) {
             </Link>
             <Link href="/portfolio" className={item}>
               <PieChart size={16} strokeWidth={1.5} /> Portfolio
-            </Link>
-            <Link href="/security" className={item}>
-              <Shield size={16} strokeWidth={1.5} /> Security
             </Link>
             <div className="flex items-center justify-between px-3 py-2 text-[14px] text-fg-2" onClick={(e) => e.stopPropagation()}>
               Network <NetworkSwitch />

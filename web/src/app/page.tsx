@@ -1,90 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useAccount } from "wagmi";
-import { useApr, useBacking, usePeopleMap, usePosts, usePostsByCreators, useStats } from "@/lib/hooks";
+import { ShieldCheck } from "lucide-react";
+import { useApr, useStats } from "@/lib/hooks";
 import { money, num } from "@/lib/format";
-import { NetBanner } from "@/components/NetBanner";
-import { PostCard } from "@/components/PostCard";
-import { Composer } from "@/components/Composer";
 import { SignIn } from "@/components/SignIn";
-import { LiveNumber, Skeleton } from "@/components/ui";
+import { LiveNumber } from "@/components/ui";
 import { WindowMark } from "@/components/WindowMark";
 
-type Tab = "all" | "backing";
 const YEAR = 365 * 24 * 3600;
-
-export default function Home() {
-  const { status } = useAccount();
-  // Anyone not actively connected (disconnected, connecting, reconnecting) sees the site, not the app.
-  if (status === "connected") return <Feed />;
-  return <Landing />;
-}
-
-function Feed() {
-  const { address } = useAccount();
-  const [tab, setTab] = useState<Tab>("all");
-  const [limit, setLimit] = useState(30);
-  const { data: posts, isLoading: allLoading } = usePosts(limit);
-  const people = usePeopleMap();
-  const { rows } = useBacking(address);
-  const creators = useMemo(() => (rows ?? []).map((r) => r.creator), [rows]);
-  const backing = useMemo(() => new Set(creators.map((c) => c.toLowerCase())), [creators]);
-  const { data: backedPosts, isLoading: backedLoading } = usePostsByCreators(creators, tab === "backing");
-  const shown = tab === "all" ? posts ?? [] : backedPosts ?? [];
-  const isLoading = tab === "all" ? allLoading : backedLoading;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <NetBanner />
-      {address && <Composer />}
-      <div className="flex items-center justify-between pt-2">
-        <h1 className="text-[22px] font-medium">Feed</h1>
-        <div className="seg" role="group" aria-label="Show">
-          <button aria-pressed={tab === "all"} onClick={() => setTab("all")}>
-            Everyone
-          </button>
-          <button aria-pressed={tab === "backing"} onClick={() => setTab("backing")}>
-            People I back
-          </button>
-        </div>
-      </div>
-      {isLoading ? (
-        <Skeleton className="h-64" />
-      ) : shown.length === 0 ? (
-        <div className="surface px-6 py-12 text-center">
-          <div className="text-[18px] font-medium">
-            {tab === "backing" ? (creators.length === 0 ? "Back someone to see their posts here" : "No posts yet from people you back") : "No posts yet"}
-          </div>
-          <p className="mt-2 text-fg-2">
-            {tab === "backing" ? (
-              creators.length === 0 ? (
-                <Link className="text-lamp hover:underline" href="/search">
-                  Find people to back
-                </Link>
-              ) : (
-                "Their posts will show up here as soon as they post"
-              )
-            ) : (
-              "Be the first to post"
-            )}
-          </p>
-        </div>
-      ) : (
-        <>
-          {shown.map((p) => (
-            <PostCard key={p.id.toString()} p={p} people={people} backing={backing} />
-          ))}
-          {tab === "all" && posts && posts.length >= limit && (
-            <button className="btn btn-quiet btn-sm self-center" onClick={() => setLimit((l) => l + 30)}>
-              Show older posts
-            </button>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
 
 const STEPS: [string, string][] = [
   ["Stake", "Put USDC behind a creator you believe in"],
@@ -92,7 +15,13 @@ const STEPS: [string, string][] = [
   ["Withdraw", "Your money stays yours. Take it back any time"],
 ];
 
-function Landing() {
+const SAFETY = [
+  "Your principal is always withdrawable, to the cent. The contract can never take more than the vault earns.",
+  "No admin keys, no upgrades, no fees — and a re-entrancy guard on everything that moves money.",
+  "34 tests including fuzzing, invariants and attack tests. Every vault is checked for hidden fees before it's used.",
+];
+
+export default function Landing() {
   const { stats, dataUpdatedAt } = useStats();
   const { apr } = useApr();
   const tvl = num(stats?.principal);
@@ -102,11 +31,7 @@ function Landing() {
         <div className="p-6 sm:p-8">
           <div className="mb-6 flex gap-1.5" aria-hidden>
             {Array.from({ length: 18 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-7 w-5 rounded-[2px]"
-                style={{ background: [2, 5, 6, 9, 12, 13, 16].includes(i) ? "var(--color-lamp)" : "var(--color-raised)" }}
-              />
+              <div key={i} className="h-7 w-5 rounded-[2px]" style={{ background: [2, 5, 6, 9, 12, 13, 16].includes(i) ? "var(--color-lamp)" : "var(--color-raised)" }} />
             ))}
           </div>
           <h1 className="text-[32px] font-medium leading-[1.08] tracking-[-0.02em] sm:text-[40px]">Back the creators you follow — with money you keep</h1>
@@ -115,10 +40,10 @@ function Landing() {
             yours. Stop backing, take it back
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <SignIn big />
-            <Link href="/search" className="btn btn-secondary btn-lg">
-              Find creators
+            <Link href="/app" className="btn btn-primary btn-lg">
+              Try the demo
             </Link>
+            <SignIn big />
           </div>
           <ol className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
             {STEPS.map(([t, s], i) => (
@@ -194,9 +119,30 @@ function Landing() {
         </Link>
       </section>
 
+      <section className="surface p-6 sm:p-8">
+        <div className="flex items-center gap-2">
+          <ShieldCheck size={18} strokeWidth={1.5} className="text-lamp" />
+          <h2 className="text-[20px] font-medium">Built to be safe with your money</h2>
+        </div>
+        <ul className="mt-4 flex flex-col gap-2">
+          {SAFETY.map((s) => (
+            <li key={s} className="flex gap-2 text-[14px] leading-[1.5] text-fg-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-lamp" aria-hidden />
+              {s}
+            </li>
+          ))}
+        </ul>
+        <Link href="/security" className="mt-4 inline-block text-[14px] text-lamp hover:underline">
+          Read the full security notes
+        </Link>
+      </section>
+
       <footer className="flex flex-wrap items-center justify-between gap-3 px-2 py-6 text-[13px] text-muted">
         <span>Backing — built for Vibeathon 02 · Night shift</span>
         <span className="flex gap-4">
+          <Link className="hover:text-fg" href="/security">
+            Security
+          </Link>
           <a className="hover:text-fg" href="https://blog.vibestarter.xyz/vibeathon-02" target="_blank" rel="noreferrer">
             Vibeathon
           </a>

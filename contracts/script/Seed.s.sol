@@ -22,21 +22,21 @@ contract Seed is Script {
         uint256 gas = vm.envOr("SEED_GAS_WEI", uint256(0.0004 ether));
         string memory img = vm.envOr("SEED_IMAGE_BASE", string(""));
 
-        string[4] memory users = ["nocturnebeats", "graveyardshift", "the3amdev", "moonlitpixels"];
-        string[4] memory bases = ["nocturne.base.eth", "graveyard.base.eth", "3amdev.base.eth", "moonlit.base.eth"];
+        string[4] memory users = ["nightbuilder", "basegremlin", "lagosdev", "moonlitpixels"];
+        string[4] memory bases = ["nightbuilder.base.eth", "basegremlin.base.eth", "lagosdev.base.eth", "moonlit.base.eth"];
         string[4] memory bios = [
-            "Lo-fi for people who work while the city sleeps. New mix every Friday night.",
-            "A weekly webcomic about night-shift nurses, cabbies and bakers.",
-            "Building open-source tools live on Base, midnight to 3am WAT.",
-            "Pixel art of empty streets and neon signs. Prints for backers."
+            "Shipping small apps on Base after dark. Deep in Vibeathon 02 this week.",
+            "Onchain tinkerer. I break things on testnet so you don't have to.",
+            "Building from Lagos, 1am to sunrise. Vibecoding everything.",
+            "UI and motion for onchain apps. Night shift only. Prints for backers."
         ];
         string[4] memory posts = [
-            "New mix is up: two hours of slow tape loops for whoever is still awake. Made it in one sitting after my shift.",
-            "Episode 14 is live. Ada finally clocks out of the 24h pharmacy and catches the last bus home.",
-            "Shipped the whole backend tonight, midnight to 3am. Base deploys are so cheap I stopped counting. Streaming the next one.",
-            "Finished the Lagos night-market series: neon, rain, empty streets. Prints next week for everyone backing the work."
+            "Night 3 of Vibeathon. Vault integration shipped: backers withdraw to the cent, creators keep the yield. Base gas is so cheap I deployed six times today.",
+            "PSA for the hackathon crowd: test your ERC-4626 round-trips before mainnet. Caught a fee-on-withdraw vault at 2am. Backing just refuses those at deploy.",
+            "3am in Lagos. The timeline is asleep, the build finally works, and the tests are green. This is the hour.",
+            "New profile cards tonight: lit-window motif, amber accent, mono numbers. Dark UI that doesn't burn your eyes at 2am."
         ];
-        string[3] memory fanNames = ["ada_reads", "tunde_nights", "zee_builds"];
+        string[3] memory fanNames = ["onchain_amara", "tunde_backs", "zee_onbase"];
 
         uint256[4] memory ck;
         uint256[6] memory fk;

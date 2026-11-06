@@ -13,7 +13,7 @@ import { NetToggle } from "./NetToggle";
 import { SignIn } from "./SignIn";
 
 const LINKS = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/app", label: "Home", icon: Home },
   { href: "/search", label: "Discover", icon: Search },
   { href: "/portfolio", label: "Portfolio", icon: PieChart },
 ];
@@ -86,7 +86,7 @@ export function TabBar() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--line)] bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
       <div className="flex items-center">
-        {tab("/", "Home", Home)}
+        {tab("/app", "Home", Home)}
         {tab("/search", "Discover", Search)}
         <div className="flex flex-1 justify-center">
           <button
