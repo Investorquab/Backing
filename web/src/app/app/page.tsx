@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
-import { useBacking, usePeopleMap, usePosts, usePostsByCreators } from "@/lib/hooks";
+import { useBacking, usePeopleMap, usePosts, usePostsByCreators, useProfile } from "@/lib/hooks";
 import { NetBanner } from "@/components/NetBanner";
 import { PostCard } from "@/components/PostCard";
 import { Composer } from "@/components/Composer";
@@ -12,6 +12,7 @@ type Tab = "all" | "backing";
 
 export default function FeedPage() {
   const { address } = useAccount();
+  const { data: me } = useProfile(address);
   const [tab, setTab] = useState<Tab>("all");
   const [limit, setLimit] = useState(30);
   const { data: posts, isLoading: allLoading } = usePosts(limit);
@@ -26,7 +27,22 @@ export default function FeedPage() {
   return (
     <div className="flex flex-col gap-4">
       <NetBanner />
-      {address && <Composer />}
+      {address &&
+        (me ? (
+          <Composer />
+        ) : (
+          <div className="surface flex flex-col items-start gap-3 p-5">
+            <div>
+              <div className="text-[17px] font-medium">Welcome — set up your profile</div>
+              <p className="mt-1 text-[14px] text-fg-2">
+                Create a profile to post, link your Farcaster and start getting backed. It takes a few seconds — we&apos;ll fill in what we can from your Farcaster.
+              </p>
+            </div>
+            <Link href="/profile/edit" className="btn btn-primary">
+              Create your profile
+            </Link>
+          </div>
+        ))}
       <div className="flex items-center justify-between pt-2">
         <h1 className="text-[22px] font-medium">Feed</h1>
         <div className="seg" role="group" aria-label="Show">

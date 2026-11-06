@@ -9,7 +9,7 @@ import { useProfile, useTx, ZERO } from "@/lib/hooks";
 import { useNet } from "@/lib/net";
 import { useMiniApp } from "@/lib/miniapp";
 import { useUpload } from "@/lib/upload";
-import { farcasterHandleFromLink } from "@/lib/farcaster";
+import { farcasterHandleFromLink, useFarcaster } from "@/lib/farcaster";
 import { isUsername } from "@/lib/format";
 import { Avatar } from "@/components/Avatar";
 import { FarcasterConnect } from "@/components/FarcasterConnect";
@@ -54,6 +54,19 @@ function Editor({ existing }: { existing?: Form }) {
       avatar: s.avatar || (u.pfpUrl && /^https:\/\//.test(u.pfpUrl) && bytes(u.pfpUrl) <= 256 ? u.pfpUrl : ""),
     }));
   }, [mini.user, existing]);
+
+  // If this wallet is on Farcaster, prefill a new profile from it so onboarding is one step.
+  const fc = useFarcaster(address);
+  useEffect(() => {
+    const u = fc.data;
+    if (existing || !u) return;
+    setF((s) => ({
+      ...s,
+      username: s.username || u.username.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20),
+      bio: s.bio || u.bio.slice(0, 280),
+      link: s.link || `https://farcaster.xyz/${u.username}`,
+    }));
+  }, [fc.data, existing]);
 
   const owner = useReadContract({
     chainId: net.chain.id,
