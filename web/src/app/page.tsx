@@ -36,8 +36,8 @@ export default function Landing() {
           </div>
           <h1 className="text-[32px] font-medium leading-[1.08] tracking-[-0.02em] sm:text-[40px]">Back the creators you follow, with money you keep</h1>
           <p className="mt-3 text-[16px] leading-[1.55] text-fg-2">
-            Tips disappear and creator coins dump. On Backing you stake USDC behind someone you believe in: it earns yield on Base, the yield goes to them, and your money stays
-            yours. Stop backing, take it back
+            Onchain creators live on one-off tips that vanish and creator coins that dump. Backing is recurring support that costs you nothing: stake USDC behind someone you
+            believe in, it earns yield in an audited lending vault on Base, the yield goes to them, and your deposit stays yours. Stop backing and take it back any time.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <Link href="/app" className="btn btn-primary btn-lg">
@@ -75,6 +75,10 @@ export default function Landing() {
 
       <section className="surface p-6 sm:p-8">
         <h2 className="text-[20px] font-medium">Why backing, not tipping</h2>
+        <p className="mt-2 text-[15px] leading-[1.55] text-fg-2">
+          No-loss support has been tried before. Backing is the version built for creators: recurring, onchain, no platform cut, and plugged straight into where they already
+          post on Farcaster.
+        </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div className="rounded-[12px] bg-raised p-4">
             <div className="text-[13px] text-muted">Tips</div>
@@ -87,6 +91,37 @@ export default function Landing() {
           <div className="rounded-[12px] border border-lamp/40 bg-raised p-4">
             <div className="text-[13px] text-lamp">Backing</div>
             <p className="mt-1.5 text-[14px] text-fg">Your money stays yours. Only the yield supports them. Zero downside</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="surface p-6 sm:p-8">
+        <h2 className="text-[20px] font-medium">Where the yield comes from</h2>
+        <p className="mt-2 text-[15px] leading-[1.55] text-fg-2">
+          Backing is not magic money. Your staked USDC is supplied to an audited onchain lending market on Base and earns the going rate. The creator claims that yield each
+          epoch, while your deposit stays yours and comes back in full the moment you withdraw.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-[12px] bg-raised p-4">
+            <div className="text-[13px] text-lamp">The vault</div>
+            <p className="mt-1.5 text-[14px] leading-[1.5] text-fg-2">
+              <a href="https://basescan.org/address/0xc1256Ae5FF1cf2719D4937adb3bbCCab2E00A2Ca" target="_blank" rel="noreferrer" className="text-fg hover:underline">
+                Moonwell Flagship USDC
+              </a>{" "}
+              on Base: an established vault paying around 4.3% APY today, with no deposit or withdrawal fees.
+            </p>
+          </div>
+          <div className="rounded-[12px] bg-raised p-4">
+            <div className="text-[13px] text-lamp">No hidden skim</div>
+            <p className="mt-1.5 text-[14px] leading-[1.5] text-fg-2">
+              The contract probes each vault at deploy and refuses any that take a fee, so your principal can never be quietly shorted.
+            </p>
+          </div>
+          <div className="rounded-[12px] bg-raised p-4">
+            <div className="text-[13px] text-lamp">Try it in seconds</div>
+            <p className="mt-1.5 text-[14px] leading-[1.5] text-fg-2">
+              The testnet demo runs a sped-up vault, so you can watch a month of yield land in seconds. Mainnet is wired to the real Moonwell vault above.
+            </p>
           </div>
         </div>
       </section>
